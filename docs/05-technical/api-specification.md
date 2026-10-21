@@ -129,7 +129,7 @@ sequenceDiagram
 
 ### 1.5 The result envelope
 
-Every Server Action returns this type **[P] (new in this doc)** for the `conflicts` field; the rest is as specified for this project:
+Every Server Action returns this type. It is the project's standard envelope; only the optional `conflicts` field is **[P] (new in this doc)**:
 
 ```ts
 type ActionResult<T> =
@@ -352,7 +352,10 @@ Every public action and page in this section needs no login. None of them return
 | Name | DAL reads `getPublicCatalog()` and `getPublicSettings()`, cached (section 1.14) |
 | DB function | `app.public_catalog()`, `app.public_settings()` |
 | Output | Catalog: active packages (ID, name, inclusions, price), active add-ons (ID, name, unit price), active delivery slots (ID, label, start, end). No stock figures **[P] (new in this doc)**: stock is checked at Submit ([BR-03][br], [EC-05][ec]). Settings: business info, the deposit amount, the notice period and on-site hours (so the form can refuse a too-early start or an arrival outside the hours before Submit, [FR-PUB-04][fr]), deposit instructions, and the free-delivery wording (O-04) |
-| Serves | [FR-PUB-01][fr], [FR-PUB-02][fr], [FR-PUB-04][fr], [FR-PUB-16][fr] |
+| Checks | None: cached, public, no personal data. No Turnstile or rate limit |
+| Result codes | `ok` only |
+| Emails | None |
+| Serves | [FR-PUB-01][fr], [FR-PUB-02][fr], [FR-PUB-04][fr], [FR-PUB-16][fr]; [WF-01A][wf-book] |
 
 ### 2.3 `submitReservation`
 
@@ -374,7 +377,7 @@ Every public action and page in this section needs no login. None of them return
 | Input | `referenceCode`, `mobile` |
 | Checks | Zod (both normalized, [FR-PUB-10][fr]); the rate limits `lookup_ip` and `lookup_fail_ref` run inside the database function so a failure is counted in the same call ([NFR-11][nfr]). No Turnstile (none is required by batch-1 docs) |
 | DB function | `app.lookup_status(p_ref_code, p_mobile_e164, p_ip)` |
-| Output `data` | `{ ok }` and the `ksb_status` cookie (section 1.13); the page then renders the status view on `/status` ([ux-and-sitemap][ux] P8, P9) |
+| Output `data` | Empty. On success the action sets the `ksb_status` cookie (section 1.13), and `/status` then renders the status view ([ux-and-sitemap][ux] P8, P9) |
 | Result codes | `invalid_mobile`, `rate_limited`, `not_found` (the same answer whether the code or the mobile was wrong, [ux-and-sitemap][ux] §7.2 "Failed lookup") |
 | Emails | None |
 | Audit | None: batch-1 docs define no audit entry for a lookup |
@@ -388,6 +391,9 @@ Every public action and page in this section needs no login. None of them return
 | DB function | `app.get_status_view(p_reservation_id)` |
 | Output | `StatusView`: `status` (the effective status: an overdue hold shows `expired`, [BR-05][br]); `serviceType`; `eventDate`; `slot { label, start, end }` or `arrivalTime`; `package { name, unitPriceCentavos }`; `addons [{ name, quantity, unitPriceCentavos }]`; `totalCentavos`, `depositCentavos`, `balanceDueCentavos` ([catalog-and-payments][cat] §2.1); `deadline` and `expiryPaused` (what the page shows while paused: [functional-requirements][fr] §7, question 2); `depositInstructions` (Awaiting Deposit only); `needsInfoMessage` (only while Pending Confirmation and flagged **[P] (new in this doc)**); `rejectionReason`, `cancellationReason`, `refundDecision { kind, amountCentavos }`; `documents [{ kind: 'deposit_ack' \| 'balance_ack', paymentId, ackNumber, void }]` and `bookingConfirmationAvailable`; `canUploadProof`, `uploadsUsed`; `canReissueQr` |
 | Never returned | Name, mobile, email, venue, customer note, internal notes, admin names other than on acknowledgments ([FR-PUB-11][fr], [NFR-15][nfr]) |
+| Checks | The cookie (section 1.13); no Turnstile; the rate limits ran at the lookup ([NFR-11][nfr]) |
+| Result codes | `ok`, `lookup_required`, `not_found` (the contact details were erased since the lookup) |
+| Emails | None |
 | Serves | [FR-PUB-11][fr], [FR-PUB-14][fr] (links); [WF-07D][wf-notify] steps 5 to 8 |
 
 ### 2.6 `reissueQrFromStatus`
@@ -438,7 +444,10 @@ Every public action and page in this section needs no login. None of them return
 | Steps | (1) SHA-256 of the token; (2) `app.resolve_qr(p_token_hash)`; (3) if valid and a request has an admin session that passes `verifySession()` (2FA passed), redirect 307 to `/admin/reservations/{id}`; (4) if valid and no admin session, show "present this at our office" with no booking data; (5) otherwise show "not found / no longer valid" with HTTP 404 ([FR-PUB-09][fr]) |
 | Valid means | The token hash matches a reservation whose **effective** status is Pending Confirmation, Awaiting Deposit, or Confirmed. An overdue hold not yet marked Expired counts as expired, so its QR shows "no longer valid" **[P] (new in this doc)**, following [BR-05][br] for [lookup-and-review][wf-review] open question 1 |
 | Headers | `Cache-Control: no-store`; `Referrer-Policy: no-referrer`, so the token never leaks to another site **[P] (new in this doc)** |
-| Rate limit | None defined ([lookup-and-review][wf-review] open question 5); [security][sec] decides |
+| Rate limit | None defined ([lookup-and-review][wf-review] open question 5); [security][sec] decides. No Turnstile |
+| DB function | `app.resolve_qr(p_token_hash)` |
+| Result | A page, not an envelope: 307, 200, or 404 as above |
+| Emails | None; no audit entry |
 | Serves | [FR-PUB-09][fr], [FR-PUB-08][fr]; [WF-03B][wf-review] |
 
 ### 2.10 Acknowledgment and booking-confirmation views
@@ -450,7 +459,10 @@ Every public action and page in this section needs no login. None of them return
 | DB function | `app.get_document(p_reservation_id, p_kind, p_payment_id)` |
 | Output | Acknowledgment: exactly the fields of [catalog-and-payments][cat] §5.3, including "received from" and "received by". A voided acknowledgment returns `void: true`; whether the customer still sees it is [catalog-and-payments][cat] §10, question 5. Booking Confirmation: available while the reservation is Confirmed ([catalog-and-payments][cat] §6); its contents and its availability after Completed or Cancelled are [catalog-and-payments][cat] §10, question 6, so other statuses return `not_found` until answered (provisional) |
 | Wording | The forbidden words and the fixed statement: [privacy-and-retention][priv] §7.1 |
-| Serves | [FR-PUB-14][fr], [FR-ADM-23][fr], [FR-NTF-07][fr] (links) |
+| Checks | Access as above; no Turnstile and no rate limit of its own (a token or cookie is needed first). Admin routes: either admin ([roles][roles] §2.2, "open and print") |
+| Result | A page: 200, or the 404 "not found" page |
+| Emails | None; no audit entry |
+| Serves | [FR-PUB-14][fr], [FR-ADM-23][fr], [FR-NTF-07][fr] (links); [WF-04D][wf-review] step 12, [WF-07D][wf-notify] step 8 |
 
 ### 2.11 Static public pages
 
@@ -472,7 +484,7 @@ The home page (`/`, [FR-PUB-01][fr]), the privacy notice (`/privacy`, [FR-PUB-15
 
 ### 3.2 Admin reads and lookups
 
-All are always live ([NFR-03][nfr]) and start with `requireAdmin()`. The overdue rule is applied in SQL by `app.effective_status`, never reimplemented in TypeScript **[P] (new in this doc)**.
+All are always live ([NFR-03][nfr]) and start with `requireAdmin()`: either admin may view, search, open, scan, and read the audit log and the health panel ([roles][roles] §2.1); `listAdminAccounts` and `getSettings` serve the Super-Admin-only pages A10 and A11 of [ux-and-sitemap][ux] and use `requireRole('superAdmin')` ([roles][roles] §2.6, §2.7). Reads write no audit entry and queue no email ([lookup-and-review][wf-review] open question 3). The overdue rule is applied in SQL by `app.effective_status`, never reimplemented in TypeScript **[P] (new in this doc)**.
 
 | Read | Page | Query or function | Returns | Serves |
 |---|---|---|---|---|
@@ -1073,7 +1085,7 @@ Each entry starts with A and R unless it says otherwise, and ends with W.
 | `app.flag_needs_info` | `…, p_message text` | Both | `pending`; overdue refused | Message | Flag and message; deadline unchanged ([D-13][dl]). Audit; email `needs_info` | `ok`, `not_allowed`, `overdue`, `reason_required` |
 | `app.clear_needs_info` | `p_reservation_id, p_expected_version` | Both | `pending`; overdue refused | The flag is set, else `not_allowed` | Flag cleared, message kept. Audit; no email | `ok`, `not_allowed`, `overdue` |
 | `app.waive_deposit` | `…, p_reason text` | Both | `pending`, `awaiting_deposit`; overdue refused, except an `awaiting_deposit` hold whose expiry is paused and whose service start has not arrived ([reservation-lifecycle][lc] rows 5 and 7) | Reason; event date = `app.manila_today()`, else `not_today` | `confirmed`, deadline null, `expiry_paused` false, `deposit_waived` true. The needs-info flag is left as it is, because the status page shows the message only while Pending Confirmation ([reservation-lifecycle][lc] §9, question 3). Audit with reason; email `confirmed` | `ok`, `not_allowed`, `overdue`, `not_today`, `reason_required` |
-| `app.edit_reservation_details` | `…, p_changes jsonb, p_reason text` | Both | `pending`, `awaiting_deposit`, `confirmed`; overdue refused | L first, only when `packageId` or `addons` change (so the lock order holds); reason; at least one real change, else `invalid_input`; `app.normalize_mobile` on a new mobile (`invalid_mobile`); delivery venue rule; new items active (`item_unavailable`); inner block: lines rewritten with `app.price_items` (unchanged lines keep their locked prices; extra units of a kept line: [catalog-and-payments][cat] §10, question 2), `app.check_addon_stock` excluding this reservation, else refuse `addon_short` | Changed fields and items, totals. The locked deposit never changes. Audit `reservation.details_edited` with field names; email `reservation_updated` | `ok`, `not_allowed`, `overdue`, `reason_required`, `invalid_mobile`, `item_unavailable`, `addon_short` |
+| `app.edit_reservation_details` | `…, p_changes jsonb, p_reason text` | Both | `pending`, `awaiting_deposit`, `confirmed`; overdue refused | L before R, only when `packageId` or `addons` change (so the lock order holds); reason; at least one real change, else `invalid_input`; `app.normalize_mobile` on a new mobile (`invalid_mobile`); delivery venue rule; new items active (`item_unavailable`); inner block: lines rewritten with `app.price_items` (unchanged lines keep their locked prices; extra units of a kept line: [catalog-and-payments][cat] §10, question 2), `app.check_addon_stock` excluding this reservation, else refuse `addon_short` | Changed fields and items, totals. The locked deposit never changes. Audit `reservation.details_edited` with field names; email `reservation_updated` | `ok`, `not_allowed`, `overdue`, `reason_required`, `invalid_mobile`, `item_unavailable`, `addon_short` |
 | `app.extend_deadline` | `…, p_new_deadline timestamptz, p_reason text` | Both | `pending`, `awaiting_deposit`; overdue refused (paused and before the service start is not overdue) | Reason; new deadline later than now **[P] (new in this doc)**; not later than the service start, else `after_service_start`; later than the current deadline, else `not_later` | Deadline. While a proof is under review, `expiry_paused` stays true and the rejection brings back the deadline stored at that moment, which is then the extended one (technical consequence of storing the pause as a flag; [edge-cases][ec] §15, question 4 decides whether that is right). Audit with reason; email `deadline_extended` | `ok`, `not_allowed`, `overdue`, `after_service_start`, `not_later`, `reason_required` |
 | `app.reschedule_reservation` | `…, p_event_date date, p_slot_id uuid, p_arrival_time time` | Both | `pending`, `awaiting_deposit`, `confirmed`; overdue refused | L (taken before R); the inputs match the reservation's service type, else `invalid_input`; a different date, slot, or time, else `invalid_input`; the slot exists and is active, else `slot_inactive` **[P] (new in this doc)**; X on the new date; inner block: `app.release_claims`, `app.claim_resource` on the new date (else refuse `not_free`), `app.check_addon_stock` (else refuse `addon_short`), new add-on claims. Booking window, on-site hours, and a start already past are not checked ([availability-and-conflicts][wf-avail] open question 5) | Event date, slot or arrival, service start; for a hold, deadline = the earlier of the current deadline and the new service start; urgent recomputed ([reservation-lifecycle][lc] §6.5). Prices kept. Audit; email `rescheduled` | `ok`, `not_allowed`, `overdue`, `slot_inactive`, `not_free`, `addon_short` |
 | `app.cancel_reservation` | `…, p_reason text, p_refund jsonb` | Both | `pending`, `awaiting_deposit`, `confirmed`; overdue refused (paused and before the service start is not overdue) | Reason; when an active (not void) deposit exists, a refund decision is required, else `refund_decision_required`; without one, a refund decision is optional (provisional, for [reservation-lifecycle][lc] §9, question 2); a partial or full amount must be more than 0 and at most the active deposit and balance payments **[P] (new in this doc)** | `cancelled`, reason, refund decision with decided-by and decided-at, needs-info cleared, `expiry_paused` false, `app.release_claims`, closure date. Audit with reason; email `cancelled` | `ok`, `not_allowed`, `overdue`, `reason_required`, `refund_decision_required`, `invalid_input` |
@@ -1102,7 +1114,7 @@ Each starts with A (both roles, [roles][roles] §2.2) and R on the payment's or 
 |---|---|---|---|---|---|
 | `app.record_deposit` | `p_reservation_id uuid, p_expected_version int, p_amount_centavos int, p_method text, p_ewallet_ref text, p_note text` | `awaiting_deposit` (overdue refused unless paused and before the service start); or `confirmed` with `deposit_waived` true ([reservation-lifecycle][lc] §5). A Confirmed booking whose deposit was voided, without a waiver: `not_allowed` until [functional-requirements][fr] §7, question 3 is answered | E-wallet rule (`invalid_ewallet_ref`); amount = the deposit snapshot (`amount_mismatch`, [EC-34][ec]); no active deposit (`deposit_exists`, [EC-35][ec]); `app.next_ack_number()` | Payment (kind deposit, ACK, received by, `verified_at`); from `awaiting_deposit`: `confirmed`, deadline null, `expiry_paused` false. A proof still waiting for review is left as it is and leaves the dashboard list with the status ([lookup-and-review][wf-review] open question 10). Closure date. Audit `payment.deposit_recorded`; email `confirmed` only on the status change | `ok`, `not_allowed`, `overdue`, `invalid_ewallet_ref`, `amount_mismatch`, `deposit_exists` |
 | `app.verify_proof` | `p_proof_id uuid, p_expected_version int, p_amount_centavos int, p_method text, p_ewallet_ref text, p_note text` | `awaiting_deposit` with `expiry_paused` true; the service start has not arrived, else `overdue` | The proof has no review yet, else `stale_version`; then the deposit checks of `record_deposit` | Proof `verified` (by, at); the deposit as `record_deposit`. Two audit entries (section 3.4); email `confirmed` | `ok`, `not_allowed`, `overdue`, `stale_version`, `invalid_ewallet_ref`, `amount_mismatch`, `deposit_exists` |
-| `app.reject_proof` | `p_proof_id uuid, p_expected_version int, p_reason text` | `awaiting_deposit`; the service start has not arrived, else `overdue` | The proof has no review yet, else `stale_version`; reason | Proof `rejected` with reason; `expiry_paused` false; audit `proof.rejected`; email `proof_not_accepted`. If the deadline has passed: `app.expire_hold(id, 'admin', p_actor_id)` in the same transaction (row 10c **[P]**, [BR-12][br]), which adds `reservation.expired` and email `expired` | `ok`, `not_allowed`, `overdue`, `stale_version`, `reason_required` |
+| `app.reject_proof` | `p_proof_id uuid, p_expected_version int, p_reason text` | `awaiting_deposit`; the service start has not arrived, else `overdue` | The proof has no review yet, else `stale_version`; reason | Proof `rejected` with reason; `expiry_paused` false; audit `proof.rejected`; email `proof_not_accepted`. If the deadline has passed: `app.expire_hold(id, 'admin', p_actor_id)` in the same transaction ([reservation-lifecycle][lc] row 10c, a [P] of [BR-12][br]), which adds `reservation.expired` and email `expired` | `ok`, `not_allowed`, `overdue`, `stale_version`, `reason_required` |
 | `app.record_balance` | `p_reservation_id uuid, p_expected_version int, p_amount_centavos int, p_method text, p_ewallet_ref text, p_note text` | `confirmed`, `completed` | E-wallet rule; `app.next_ack_number()`. More than one balance is not blocked ([catalog-and-payments][cat] §10, question 1) | Payment (kind balance, ACK, received by); closure date. Audit `payment.balance_recorded`; no email | `ok`, `not_allowed`, `invalid_ewallet_ref` |
 | `app.void_payment` | `p_payment_id uuid, p_expected_version int, p_reason text` | Any status; overdue accepted | The payment exists, else `not_found`; not void, else `already_void` (the [P] of [WF-06J][wf-change] step 5); reason | Void fields (reason, by, at); the ACK number stays retired; closure date recomputed from the payments that are not void (provisional, [changes-and-expiry][wf-change] open question 11). Audit `payment.voided` with reason; no email | `ok`, `not_found`, `already_void`, `reason_required` |
 | `app.record_refund` | `p_reservation_id uuid, p_expected_version int, p_amount_centavos int, p_method text, p_ewallet_ref text, p_note text` | `cancelled` | A refund decision of kind partial or full, else `not_allowed` (provisional, section 3.4); e-wallet rule. The amount is not compared with the decision ([catalog-and-payments][cat] §10, question 3) | Payment (kind refund, no ACK, paid by); closure date. Audit `payment.refund_recorded`; no email | `ok`, `not_allowed`, `invalid_ewallet_ref` |

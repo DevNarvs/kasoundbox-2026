@@ -322,7 +322,7 @@ Not needed. Every step of this sub-flow happens in the customer's browser; batch
 | A landline, or a number one digit short | Rejected with a clear message | [EC-11][ec] |
 | No email address | The booking works normally; the status page is the source of truth | [EC-12][ec] |
 | The venue may be outside the service area | Not checked here; an admin checks during review and approves or rejects | [EC-13][ec] |
-| A new website version goes live while the form is open | The page asks the customer to reload; the draft and the duplicate-submission key are kept in the browser session | [EC-02][ec] |
+| A new website version goes live while the form is open | The page asks the customer to reload; the draft is kept in the browser's session storage and the duplicate-submission key in its local storage | [EC-02][ec] |
 | The customer types sensitive data in the note despite the warning | Not defined yet: [privacy-and-retention][priv] §11, question 9 | — |
 
 ### Status transitions involved
@@ -332,7 +332,7 @@ None. Nothing is saved in the database until WF-01C.
 ### Developer notes
 
 - **Validation.** React Hook Form with the Zod resolver **[P]** ([spec v0.2][spec] §10); the same Zod schemas run again on the server ([FR-PUB-06][fr]). The mobile conversion runs in the form and again in the database ([BR-11][br]).
-- **Draft and key.** The draft and the hidden duplicate-submission key live in browser session storage ([FR-PUB-06][fr], [EC-02][ec]); for example, a random UUID made when the draft starts. See open question 3 on tabs and new keys.
+- **Draft and key.** The draft lives in browser session storage. The hidden duplicate-submission key, a random UUID made when the draft starts, lives in local storage, so a second tab of the same browser sends the same key ([FR-PUB-06][fr], [EC-01][ec], [EC-02][ec]; [security][sec] §4.4; [api-specification][api] §1.8; reconciled 2026-10-21).
 - **Display only.** The review's amounts are shown from the catalog; the amounts saved are always calculated by the server at Submit, never taken from the browser ([catalog-and-payments][cat] §2.1 developer note, [NFR-21][nfr]).
 - **Accessibility.** Visible labels, "required" in words, errors next to the field and read out by screen readers ([NFR-17][nfr]).
 - **Database function / server action / audit category / outbox email type:** none in this sub-flow.
@@ -355,7 +355,7 @@ When the customer presses Submit, the website first checks that a person, not a 
 |---|---|
 | Customer (browser) | Runs the bot check, sends the form with its hidden duplicate-submission key, reads the result |
 | Cloudflare Turnstile | The free bot check: gives the browser a token and confirms it to the server ([NFR-12][nfr]) |
-| Next.js server action | Rate limit, honeypot, Turnstile check, field validation, one call to the booking function, the reply page, sending queued emails after the reply |
+| Next.js server action | Honeypot, rate limit, field validation, Turnstile check, one call to the booking function, the reply page, sending queued emails after the reply |
 | Postgres booking function | Every booking rule in one transaction: lock, duplicate key, overdue holds, notice, hold limits, breaker, capacity, stock, saving, audit entry, queued emails |
 | Outbox (database table) | Holds each email saved in the same step as the change ([FR-NTF-16][fr]) |
 | Resend | Sends the emails ([FR-NTF-16 to FR-NTF-20][fr]) |
@@ -375,15 +375,18 @@ When the customer presses Submit, the website first checks that a person, not a 
 ```mermaid
 flowchart TD
     S1["Customer presses Submit"] --> S2["Browser sends the form, the Turnstile token,<br/>the hidden fields, and the duplicate-submission key"]
-    S2 --> D1{"Under the submission<br/>rate limit?"}
+    S2 --> D0{"Honeypot<br/>empty?"}
+    D0 -->|"No"| X2["Refused: bot check failed"]
+    D0 -->|"Yes"| D1{"Under the submission<br/>rate limit?"}
     D1 -->|"No"| X1["Refused for a while<br/>form keeps the data"]
-    D1 -->|"Yes"| D2{"Turnstile passed and<br/>honeypot empty?"}
-    D2 -->|"No"| X2["Refused: bot check failed"]
-    D2 -->|"Yes"| D3{"Every field valid?<br/>mobile converted to +639"}
+    D1 -->|"Yes"| D3{"Every field valid?<br/>mobile converted to +639"}
     D3 -->|"No"| X3["Message next to each field<br/>form keeps the data"]
-    D3 -->|"Yes"| S3["One call to the booking function<br/>takes the capacity lock"]
+    D3 -->|"Yes"| D2{"Turnstile<br/>passed?"}
+    D2 -->|"No"| X2
+    D2 -->|"Yes"| S3["One call to the booking function<br/>takes the capacity lock"]
     S3 --> D4{"Duplicate-submission key<br/>already used?"}
-    D4 -->|"Yes"| R1["Return the same reservation<br/>and reference code"]
+    D4 -->|"Yes, same data"| R1["Return the same reservation<br/>and reference code"]
+    D4 -->|"Yes, other data"| X11["Refused: looks like a new booking<br/>the browser makes a new key"]
     D4 -->|"No"| S4["Expire overdue holds"]
     S4 --> ST0["Overdue holds, if any: Expired"]
     ST0 --> D10{"Date inside the<br/>booking window?"}
@@ -399,7 +402,7 @@ flowchart TD
     D8 -->|"No"| X8["Just taken<br/>pick another date"]
     D8 -->|"Yes"| D9{"Enough add-on stock?"}
     D9 -->|"No"| X9["Refused: not enough<br/>of that add-on"]
-    D9 -->|"Yes"| S5["Save: claims, price snapshot,<br/>service start, deadline, urgent flag,<br/>codes from WF-02"]
+    D9 -->|"Yes"| S5["Save: claims, price snapshot,<br/>service start, deadline,<br/>codes from WF-02"]
     S5 --> ST1["Status: Pending Confirmation"]
     ST1 --> S6["Same step: audit entry,<br/>queued emails, key saved"]
     S6 --> S7["Confirmation page<br/>WF-02"]
@@ -412,13 +415,13 @@ flowchart TD
     classDef status fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
     class S1,S2 customer
-    class D1,D2,D3,S3,D4,R1,S4,D10,D5,D6,D7,D8,D9,S5,S6,S7,S8 system
+    class D0,D1,D2,D3,S3,D4,R1,S4,D10,D5,D6,D7,D8,D9,S5,S6,S7,S8 system
     class ST0,ST1 status
     class A1 admin
-    class X1,X2,X3,X4,X5,X6,X7,X8,X9,X10 failure
+    class X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11 failure
 ```
 
-The order of the checks inside the database follows [BR-09][br] (developer note): lock, overdue holds, notice, hold limits and breaker, set or room, then add-on stock. That note does not place the booking-window check, which [reservation-lifecycle][lc] §4.2 row 1 makes a precondition of a submission; its place here, just before the notice check, is indicative. The order of the first server checks (rate limit, bot check, fields, duplicate key) is not fixed by batch-1 docs; see open question 5.
+The order of the checks inside the database follows [BR-09][br] (developer note): lock, overdue holds, notice, hold limits and breaker, set or room, then add-on stock. That note does not place the booking-window check, which [reservation-lifecycle][lc] §4.2 row 1 makes a precondition of a submission; its place here, just before the notice check, is indicative. The order of the first server checks is set in [api-specification][api] §2.3: honeypot, rate limit, fields, Turnstile, then the one call to the booking function, which checks the duplicate key (reconciled 2026-10-21; open question 5).
 
 ### Sequence diagram: submission end to end
 
@@ -434,7 +437,7 @@ sequenceDiagram
     C->>T: Run the bot check
     T-->>C: Single-use token
     C->>N: Submit with form data, token, honeypot, duplicate key
-    N->>N: Rate limit, honeypot, Zod validation, mobile to E.164
+    N->>N: Honeypot, rate limit, Zod validation, mobile to E.164
     N->>T: Verify the token
     T-->>N: Pass or fail
     alt a server check failed
@@ -442,7 +445,7 @@ sequenceDiagram
     else server checks passed
         N->>DB: One call to app.book_reservation
         Note over DB: Capacity lock, duplicate key, expire overdue holds,<br/>booking window, notice, hold limits, breaker,<br/>claim a set or the room, add-on stock
-        alt key already used
+        alt key already used, same data
             DB-->>N: The same reservation and reference code
             N-->>C: Confirmation again, nothing new created
         else breaker trips on the 7th request
@@ -471,13 +474,13 @@ sequenceDiagram
 
 | Step | Actor | What happens | Data created, updated, or read | Rules and requirements |
 |---|---|---|---|---|
-| 1 | Customer browser | Runs the Turnstile check and sends the form data, the Turnstile token, the honeypot field, and the duplicate-submission key. | Browser session: draft and key | [FR-PUB-06][fr], [NFR-12][nfr] |
-| 2 | Next.js server | **Rate limit.** Too many submissions from one internet address (5 per IP per hour by default, NFR-11) are refused for a while. | Read and update: rate-limit counter, keyed by an HMAC of the IP | [NFR-11][nfr], [FR-SYS-06][fr], [EC-14][ec] |
-| 3 | Next.js server | **Bot checks.** The honeypot must be empty, and the Turnstile token must pass. | — | [NFR-12][nfr], [FR-PUB-06][fr], [EC-14][ec] |
-| 4 | Next.js server | **Fields.** Every field is validated again with the shared schema, and the mobile number is converted to the standard form. | — | [FR-PUB-06][fr], [BR-11][br], [NFR-21][nfr] |
+| 1 | Customer browser | Runs the Turnstile check and sends the form data, the Turnstile token, the honeypot field, and the duplicate-submission key. | Browser: the draft (session storage) and the key (local storage) | [FR-PUB-06][fr], [NFR-12][nfr] |
+| 2 | Next.js server | **Honeypot, then rate limit.** The honeypot must be empty, else the bot check fails. Then too many submissions from one internet address (5 per IP per hour by default, NFR-11) are refused for a while; a repeat with the same key counts too. | Read and update: rate-limit counter, keyed by an HMAC of the IP | [NFR-12][nfr], [NFR-11][nfr], [FR-SYS-06][fr], [EC-14][ec] |
+| 3 | Next.js server | **Fields.** Every field is validated again with the shared schema, and the mobile number is converted to the standard form. | — | [FR-PUB-06][fr], [BR-11][br], [NFR-21][nfr] |
+| 4 | Next.js server | **Turnstile.** The Turnstile token must pass, checked with Cloudflare. | — | [NFR-12][nfr], [FR-PUB-06][fr], [EC-14][ec] |
 | 5 | Next.js server | Makes **one** call to the booking function. The rest of the submission happens inside it, all or nothing. | — | [FR-PUB-06][fr], [NFR-21][nfr] |
 | 6 | Database | Takes the single capacity lock. | Lock row | [NFR-20][nfr], [BR-09][br] developer note |
-| 7 | Database | **Duplicate submission.** If this key already belongs to a reservation, returns that reservation and its reference code. Nothing new is created. | Read: duplicate-submission keys (hashed) | [FR-PUB-06][fr], [EC-01][ec] |
+| 7 | Database | **Duplicate submission.** If this key already belongs to a reservation and the request's data is the same, returns that reservation and its reference code; with other data, refuses it (`submission_key_mismatch`), and the browser makes a new key ([api-specification][api] §1.8). Nothing new is created. | Read: duplicate-submission keys (hashed) | [FR-PUB-06][fr], [EC-01][ec] |
 | 8 | Database | Marks overdue holds Expired before claiming. Each one is the normal "deadline passed" change of lifecycle rows 9 and 10, so it writes its audit entry and queues the expired email, as every status change does. Which overdue holds (every one, or only those on the requested date): open question 8. | Update: overdue holds → Expired; create: their audit entries and outbox rows | [BR-05][br], [BR-09][br] developer note, [FR-PUB-06][fr] developer note, [reservation-lifecycle][lc] §4.1 and §4.2 rows 9 and 10, [FR-NTF-12][fr] |
 | 9 | Database | **Booking window.** The event date must be within the booking window. The form checked it first (step 4); the database checks it again at the moment of Submit. | Read: booking window setting | [BR-09][br], [reservation-lifecycle][lc] §4.2 row 1, [EC-08][ec] |
 | 10 | Database | **Notice.** The service start must be at least the notice period after the moment of Submit. | Read: notice period setting | [BR-06][br], [EC-06][ec] |
@@ -485,7 +488,7 @@ sequenceDiagram
 | 12 | Database | **Breaker.** If online booking is paused, refuses. If this request would be the 7th online request within 60 minutes (BR-07a), refuses it, pauses online booking, and queues one email to both admins. Either admin can end the pause early ([WF-08G](administration.md)). | Read: online requests of the last 60 minutes, the pause setting. On a trip: update the pause setting; queue the paused email; audit entry, actor "system" | [BR-07a][br], [FR-NTF-15][fr], [roles][roles] §4, [EC-15][ec] |
 | 13 | Database | **Capacity.** Claims a free delivery set (delivery) or the room (on-site) for the event date. The customer never picks the set. | Create: set or room claim | [BR-01][br], [BR-02][br], [BR-04][br], [BR-08][br], [EC-03][ec], [EC-04][ec], [EC-17][ec] |
 | 14 | Database | **Add-on stock.** Checks the stock for that date and claims the quantities. | Create: add-on claims, with unit-price snapshot | [BR-03][br], [EC-05][ec] |
-| 15 | Database | **Saves the reservation:** status Pending Confirmation, source `online`, service start, deadline (submission + 72 hours, capped at the service start), urgent if the event date is today, the price and deposit snapshot, the customer details, and the reference code and QR hash from WF-02. | Create: reservation | [reservation-lifecycle][lc] §3.1, §3.2, §4.2 row 1; [catalog-and-payments][cat] §2.2; [D-12][dl]; [BR-06a][br] |
+| 15 | Database | **Saves the reservation:** status Pending Confirmation, source `online`, service start, deadline (submission + 72 hours, capped at the service start), the price and deposit snapshot, the customer details, and the reference code and QR hash from WF-02. "Urgent" is not stored: it is worked out whenever the event date is today [P] (reconciled 2026-10-21; [data-model](../05-technical/data-model.md)). | Create: reservation | [reservation-lifecycle][lc] §3.1, §3.2, §4.2 row 1; [catalog-and-payments][cat] §2.2; [D-12][dl]; [BR-06a][br] |
 | 16 | Database | In the same step: writes the audit entry (actor "customer"); queues the request-received email (only if an email was given) and the new-online-request email to both admins (urgent ones marked); saves the key against the reservation. | Create: audit entry, outbox rows, duplicate-submission key | [FR-PUB-06][fr], [FR-ADM-32][fr], [FR-NTF-01][fr], [FR-NTF-13][fr], [FR-NTF-16][fr] |
 | 17 | Next.js server | Shows the confirmation page (WF-02). | — | [FR-PUB-07][fr] |
 | 18 | Next.js server, Resend | Right after the reply, tries to send the queued emails. The every-minute job sends anything still waiting, with retries and caps: the email pipeline, [WF-07A](notifications-and-tracking.md). | Update: outbox status | [FR-NTF-16 to FR-NTF-20][fr], [FR-SYS-03][fr] |
@@ -495,10 +498,11 @@ sequenceDiagram
 
 | Decision | If it fails | What the customer sees | Rule |
 |---|---|---|---|
+| Honeypot empty? | Refused | A bot-check message | [NFR-12][nfr], [FR-PUB-06][fr] |
 | Under the submission rate limit? | Refused for a while | A clear message; the form keeps the data | [NFR-11][nfr] |
-| Turnstile passed and honeypot empty? | Refused | A bot-check message (wording: open question 5) | [NFR-12][nfr], [FR-PUB-06][fr] |
 | Every field valid (mobile form, venue for delivery, note length, a date inside the booking window, an active slot, an arrival inside on-site hours)? | Refused | Messages next to the fields; the form keeps the data | [FR-PUB-04][fr], [FR-PUB-05][fr], [BR-09][br], [BR-11][br], [reservation-lifecycle][lc] §4.2 row 1 |
-| Is the duplicate-submission key new? | Not a failure: the same reservation is returned | The same confirmation and reference code | [FR-PUB-06][fr], [EC-01][ec] |
+| Turnstile passed? | Refused | The same bot-check message | [NFR-12][nfr], [FR-PUB-06][fr] |
+| Is the duplicate-submission key new? | Not a failure if the data is the same: the same reservation is returned. With other data: refused | The same confirmation and reference code; or "This looks like a new booking" | [FR-PUB-06][fr], [EC-01][ec]; [api-specification][api] §1.8 |
 | Is the event date inside the booking window, at the moment of Submit (database)? | Refused | A clear message; the form keeps the data | [BR-09][br], [reservation-lifecycle][lc] §4.2 row 1, [EC-08][ec] |
 | Start at least the notice period after Submit? | Refused | "Too soon"; message or call the business | [BR-06][br] |
 | Hold limits met for this mobile number? | Refused | A clear message | [BR-07][br] |
@@ -694,11 +698,11 @@ No other difference affects WF-01 or WF-02.
 
 These are not decided here. If the reviewers agree they need an answer, add each one to the [decision log][dl] as a new open item (O-12 onwards), or settle it in the batch-3 doc named.
 
-1. **The QR link in the request-received email.** Only the SHA-256 of the QR token is stored ([FR-PUB-08][fr]), but the email must carry the QR link ([FR-NTF-01][fr]) and may be sent or retried later by the every-minute job ([FR-NTF-16][fr]). Where does the job get the link? Keeping it in the outbox row until sent would put a working link in the database. (Security doc and api-specification, batch 3; planned: `05-technical/security.md`.)
+1. **The QR link in the request-received email.** Resolved (reconciled 2026-10-21): the server makes the token and encrypts the link; the outbox row keeps only the ciphertext, which is erased once the email is sent or the QR code stops working (option B of [security][sec] §4.5.4; [api-specification][api] §1.13).
 2. **The QR code on a repeat submission.** A double click or a retry returns the same reservation and reference code ([FR-PUB-06][fr], [EC-01][ec]). The original QR code cannot be rebuilt from its hash, and after a network error the browser never received it. Should the repeat show the QR code (for example by issuing a new one), show only the reference code, or something else?
-3. **The duplicate-submission key across tabs, and a second booking.** The key is "kept in the browser session" ([FR-PUB-06][fr], [EC-02][ec]), yet a second browser tab must return the same reservation ([EC-01][ec]); browser session storage is usually per tab. Which storage is meant? When is a new key made, so that a second, different booking from the same browser is not mistaken for a repeat? And if a repeat carries different data (for example, the customer changed the date after a network error), is the earlier reservation still returned?
+3. **The duplicate-submission key across tabs, and a second booking.** Resolved (reconciled 2026-10-21): the key is kept in local storage, so a second tab sends the same key, and the draft in session storage; a new key is made after a refusal or a success; the same key with other data is refused with `submission_key_mismatch` ([security][sec] §4.4; [api-specification][api] §1.8). The "browser session" wording of [FR-PUB-06][fr], [EC-01][ec], and [EC-02][ec] still needs the matching update.
 4. **The catalog changes while the form is open.** The saved prices are the ones the server calculates at Submit ([catalog-and-payments][cat] §2.1), but the customer pays the price they saw ([D-12][dl]). If a price changes between the review and Submit, or the chosen package, add-on, or delivery slot is archived, should Submit refuse and show the new details, or accept?
-5. **The first server checks.** Batch-1 docs do not fix the order of the rate limit, honeypot, Turnstile, field validation, and the duplicate-key check, whether a repeat with the same key counts toward the submission rate limit, or what a request caught by the honeypot or Turnstile is shown. (api-specification and security, batch 3.)
+5. **The first server checks.** Resolved (reconciled 2026-10-21): honeypot, rate limit, field validation, Turnstile, then `app.book_reservation`, which checks the duplicate key ([api-specification][api] §2.3); a repeat with the same key counts toward the rate limit; both bot checks give one generic message (`bot_check_failed`).
 6. **Recording the policy agreement.** The customer must agree to the policies before Submit ([FR-PUB-06][fr]). Is the agreement stored (for example the time and the version of the notice), and if so, for how long? ([privacy-and-retention][priv]; lawyer review, O-08.)
 7. **Is the name required?** [FR-PUB-05][fr] lists the name but does not say whether it is required (the mobile number is required, the email optional). Acknowledgments print it as "received from" ([catalog-and-payments][cat] §5.3).
 8. **Which overdue holds the booking function expires.** [BR-09][br] and [FR-PUB-06][fr] (developer notes) say the function expires stale holds before it claims (WF-01C step 8). Does it expire every overdue hold, or only those on the requested date and service type? (Each one is the normal "deadline passed" change, with its audit entry and expired email: [reservation-lifecycle][lc] §4.1 and rows 9 and 10. A reschedule expires those on the target date, lifecycle §6.5.) This is the one place this question is kept; [availability-and-conflicts](availability-and-conflicts.md) WF-05B, [changes-and-expiry](changes-and-expiry.md) WF-06F, and [notifications-and-tracking](notifications-and-tracking.md) WF-07B link here. (api-specification, batch 3.)
@@ -719,4 +723,6 @@ Already listed in batch-1 docs, and not repeated here: whether the venue street 
 [priv]: ../01-requirements/privacy-and-retention.md
 [lc]: ../02-domain/reservation-lifecycle.md
 [cat]: ../02-domain/catalog-and-payments.md
+[api]: ../05-technical/api-specification.md
+[sec]: ../05-technical/security.md
 [spec]: ../superpowers/specs/2026-10-21-kasoundbox-design.md

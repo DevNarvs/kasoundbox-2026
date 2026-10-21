@@ -198,8 +198,8 @@ These are the paths a request takes through the components. The business steps a
 
 **Workflows:** [WF-01C][wf-book] (submit and server checks), [WF-02][wf-book] (reference code and QR), [WF-05C][wf-avail] (two customers at the same instant), [WF-07A][wf-notify] (sending the emails).
 
-1. The browser runs the Turnstile widget. It sends the form, the Turnstile token, the honeypot field, and the duplicate-submission key kept in `sessionStorage` ([EC-01][ec], [EC-02][ec]).
-2. The public server action `submitReservation` (in `lib/actions/public`) parses the input with Zod, checks the honeypot, and calls Turnstile's siteverify from the server, with a time limit on the call.
+1. The browser runs the Turnstile widget. It sends the form, the Turnstile token, the honeypot field, and the duplicate-submission key, which is kept in `localStorage` so a second tab sends the same key; the draft stays in `sessionStorage` ([EC-01][ec], [EC-02][ec]; [security][sec] §4.4; reconciled 2026-10-21).
+2. The public server action `submitReservation` (in `lib/actions/public`) checks the honeypot and the submission rate limit, parses the input with Zod, and then calls Turnstile's siteverify from the server, with a time limit on the call, in the order of [api-specification][api] §2.3 (reconciled 2026-10-21).
 3. It makes **one** call through the transaction pooler: `SELECT app.book_reservation(...)`. Inside that single statement, Postgres takes the capacity lock and applies every rule of [WF-01C][wf-book] (section 6.4).
 4. The action renders the confirmation page, with the QR code drawn by `uqr` as an inline SVG ([FR-PUB-07][fr]).
 5. After the reply, `after()` sends the emails that the function queued in the outbox. Anything not sent is picked up by the every-minute tick (section 3.4).
@@ -245,7 +245,7 @@ One Next.js app has two areas ([spec v0.2][spec] §10; [roles][roles] §7). They
 
 - **`lib/actions/public/*`** holds the public server actions: submit, status lookup, QR reissue from the status page, and the two proof-upload steps ([WF-07D][wf-notify], [WF-07E][wf-notify]). They may call only the public database functions, and those return minimal, customer-safe data.
 - **`lib/actions/admin/*`** holds the admin server actions. Every file starts with `import 'server-only'` and exports only actions.
-- Every exported `'use server'` function is a public HTTP endpoint that anyone can POST to directly. So every action runs the same four steps, in this order: (1) parse with Zod; (2) authorize (the DAL for admin actions; Turnstile and the honeypot for public ones); (3) one database call; (4) return a minimal result.
+- Every exported `'use server'` function is a public HTTP endpoint that anyone can POST to directly. So every action runs the same steps, in this order: (1) authorize (for admin actions, the DAL as the first line; for the public submit, the honeypot and the rate limit); (2) parse with Zod; (3) for the public submit, Turnstile; (4) one database call; (5) return a minimal result ([api-specification][api] §2.3, §3.1; reconciled 2026-10-21).
 - The real guard behind the module split is in the database: every admin function checks the acting admin's role again ([WF-09C][wf-admin] step 9).
 
 ### 4.3 The DAL check in every admin page, action, and route
@@ -346,7 +346,7 @@ export const db = drizzle({ client: pool });
 
 [NFR-20][nfr] owns the requirement and [WF-05B][wf-avail] the steps. Technically:
 
-- Every function that uses or frees capacity (book, staff booking, reschedule, edit details, block, recreate) starts with `SELECT … FROM app.capacity_lock WHERE id = 1 FOR UPDATE` on a single row. Which actions take the lock is also [availability-and-conflicts][wf-avail] open question 2.
+- Every function that claims capacity or could make a clash check stale (book, staff booking, reschedule, edit details when items change, block create and remove, recreate, lowering add-on stock, archiving an item, deactivating a resource) starts with `SELECT … FROM app.capacity_lock WHERE id = 1 FOR UPDATE` on a single row. Functions that only free capacity do not ([api-specification][api] §5.1, for [availability-and-conflicts][wf-avail] open question 2; reconciled 2026-10-21).
 - Under the lock it expires overdue holds for the dates it touches, checks the rules, counts add-on stock, and writes the claims.
 - The partial unique index on live claims, across bookings and blocks ([data-model][data]), is the hard guard. A `unique_violation` is returned as "just taken", never as a server error ([EC-03][ec], [EC-17][ec]).
 - **Waiting too long.** If the lock wait reaches `lock_timeout`, the function catches the error and returns a "busy, please try again" result instead of failing **[P] (new in this doc)**.
@@ -367,7 +367,7 @@ flowchart TD
         C1["pg_cron every minute<br/>expire overdue holds: FR-SYS-01"]
         C2["pg_cron every minute<br/>queue due reminders: FR-SYS-02"]
         C3{"pg_cron every minute<br/>any emails due? FR-SYS-03"}
-        C4["pg_cron daily at 00:15 Manila<br/>Completed, retention, IP key, keep-alive<br/>FR-SYS-04 to FR-SYS-07"]
+        C4["pg_cron daily from 00:15 Manila<br/>Completed, retention, IP key, keep-alive<br/>FR-SYS-04 to FR-SYS-07"]
         C5{"pg_cron every 5 minutes [P]<br/>job_runs fresh?"}
         OB["notifications_outbox"]
         JRS["job_runs<br/>FR-SYS-10"]
@@ -402,23 +402,23 @@ flowchart TD
 | `pg_cron` | `* * * * *` | `app.expire_overdue_holds()`, pure SQL | [FR-SYS-01][fr] |
 | `pg_cron` | `* * * * *` | `app.queue_due_reminders()`, pure SQL | [FR-SYS-02][fr] |
 | `pg_cron` | `* * * * *` | If due outbox rows exist: `net.http_post` to the tick URL | [FR-SYS-03][fr] |
-| `pg_cron` | `15 16 * * *` (the daily time in [NFR-19][nfr]) | `app.complete_finished_events()`, `app.run_retention()`, the IP-key rotation, and the keep-alive query | [FR-SYS-04][fr] to [FR-SYS-07][fr] |
+| `pg_cron` | From `15 16 * * *` (00:15 Manila, the daily time in [NFR-19][nfr]) to `35 16 * * *`, staggered as in [api-specification][api] §6 | `app.complete_finished_events()`, `app.run_retention()`, the IP-key rotation, and the keep-alive query, from 00:15 Manila | [FR-SYS-04][fr] to [FR-SYS-07][fr] |
 | `pg_cron` | `*/5 * * * *` | Heartbeat: if `job_runs` shows fresh runs of the every-minute jobs, a `pg_net` check-in to the Sentry cron monitor **[P] (new in this doc)** | [NFR-24][nfr] |
 | `pg_cron` | daily | Delete `cron.job_run_details` rows older than 7 days, so the log table stays small **[P] (new in this doc)** | — |
 | Vercel Cron | `0 18 * * *` **[P] (new in this doc)** | `/api/jobs/daily` | [FR-SYS-08][fr] |
 | GitHub Actions | nightly | The encrypted backup (section 11.3) | [FR-SYS-12][fr] |
 
-- **Why the daily Vercel run is at `0 18 * * *`.** That is 02:00 Manila. Vercel Hobby cron may fire anywhere within that hour **[U]**, so the run always comes after the 00:15 daily SQL jobs and can check that they wrote their `job_runs` records.
+- **Why the daily Vercel run is at `0 18 * * *`.** That is 02:00 Manila. Vercel Hobby cron may fire anywhere within that hour **[U]**, so the run always comes after the daily SQL jobs (00:15 to 00:35 Manila) and can check that they wrote their `job_runs` records.
 - **Supabase's own guidance** is to keep at most 8 jobs running at once, each under 10 minutes **[U]**. These jobs are far smaller.
-- **Proof file deletion.** The retention job must delete proof files through the Storage API, never by deleting `storage.objects` rows in SQL. Whether it calls the API through `pg_net` or hands the work to `/api/jobs/daily` is for [api-specification][api] ([WF-10E][wf-admin] developer notes).
+- **Proof file deletion.** Proof files are deleted through the Storage API, never by deleting `storage.objects` rows in SQL. The retention job marks them due, and the tick and the daily route delete them ([api-specification][api] §4.1, §4.2; [WF-10E][wf-admin] developer notes).
 
 ### 7.2 Overlap guard
 
 [FR-SYS-09][fr] requires that two runs of the same job never overlap, using an advisory lock. Through the transaction pooler, a session-level advisory lock is not safe (section 6.2). So **[P] (new in this doc)**:
 
 - **SQL jobs** (`pg_cron`) take `pg_try_advisory_xact_lock(<job id>)` as their first statement and return at once if another run holds it. The lock ends with the job's own transaction.
-- **The two job routes** run several database calls with Resend calls in between, so a transaction lock would not cover the whole run. They take a **lease row** instead: one function call such as `app.try_start_job('tick', interval '2 minutes')` succeeds only if no unexpired lease exists, and the run ends by releasing it. A crashed run's lease simply expires.
-- **Outbox rows** are claimed with `FOR UPDATE SKIP LOCKED`, and the claim also pushes the row's next-attempt time forward by a short lease, so the `after()` sender, the tick, and the daily sweep never send the same row at once. Whether this uses the next-attempt column or a separate claimed-until column is for [data-model][data].
+- **The two job routes** run several database calls with Resend calls in between, so a transaction lock would not cover the whole run. They take a **lease row** instead: the job's row in `job_leases` (`job_name`, `lease_until`, `holder`; [data-model][data] §5.15). One function call such as `app.try_start_job('tick', interval '2 minutes')` succeeds only if that row's `lease_until` has passed, and `app.finish_job` releases it at the end. A crashed run's lease simply expires. The run itself is a `job_runs` row ([api-specification][api] §4; reconciled 2026-10-21).
+- **Outbox rows** are claimed with `FOR UPDATE SKIP LOCKED`, and the claim also pushes the row's `next_attempt_at` forward by a short lease, so the `after()` sender, the tick, and the daily sweep never send the same row at once. No separate claimed-until column exists ([data-model][data] §5.12).
 
 ### 7.3 Vercel Cron and the daily route
 
@@ -454,6 +454,8 @@ Names and purposes only. Values are never written in the code or in these docs (
 | `BETTER_AUTH_SECRETS` | No | Better Auth's signing secrets. Rotate them only through this variable. The exact names Better Auth 1.7.12 reads are confirmed at setup **[U]** |
 | `BETTER_AUTH_URL` | No | The base address Better Auth uses for its routes and cookies **[U]** |
 | `CRON_SECRET` | No | The bearer secret for both job routes. Vercel Cron sends it **[U]**; the same value is stored in Vault for `pg_net` |
+| `OUTBOX_LINK_KEY` | No | 32 random bytes: encrypts the QR link of a queued request-received email (option B of [security][sec] §4.5.4). Production only; previews get none. The database never holds it **[P] (reconciled 2026-10-21)** |
+| `STATUS_COOKIE_KEY` | No | Signs the `ksb_status` lookup cookie ([security][sec] §4.5.2; [api-specification][api] §1.13) **[P] (reconciled 2026-10-21)** |
 | `TURNSTILE_SECRET_KEY` | No | Server-side siteverify |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Yes | The Turnstile widget |
 | `RESEND_API_KEY` | No | Sending email |
@@ -474,10 +476,11 @@ Names and purposes only. Values are never written in the code or in these docs (
 | Supabase Vault | `job_route_secret` | The same value as `CRON_SECRET`, read by `pg_net` |
 | Supabase Vault | `tick_url` | `SITE_URL` + `/api/jobs/tick`. It changes when the site moves host (section 12) |
 | Supabase Vault | `sentry_checkin_url` **[P] (new in this doc)** | The Sentry cron monitor's check-in address (section 7.4) |
+| Supabase Vault | `ip_hmac_key` | The daily IP-HMAC key, written and overwritten by `app.rotate_ip_key()`, read only inside the database ([data-model][data] §5.14; [FR-SYS-06][fr]) |
 | Developer's laptop only | the password of the database's `postgres` role | Migrations and the break-glass script ([WF-09E][wf-admin]). Never stored in GitHub or Vercel |
 | Offline only | the `age` private key | Needed only for a restore ([NFR-13][nfr]) |
 
-- The IP-HMAC keys are not environment variables. They live in the database and are rotated by the daily SQL job ([FR-SYS-06][fr]); details in [security][sec].
+- The IP-HMAC key is not an environment variable. It is the Vault secret `ip_hmac_key` above, rotated by the daily SQL job ([FR-SYS-06][fr]); details in [security][sec] §4.4 (reconciled 2026-10-21).
 - **Previews never get production secrets** ([NFR-13][nfr]). By default a preview gets no database and no email keys at all, so it can build and show the static pages only **[P] (new in this doc)**. A staging database is open question 9.
 
 ---
@@ -578,7 +581,7 @@ There is no public sign-up ([NFR-09][nfr], [roles][roles] §5.1). `scripts/seed-
 - It asks for each email address and first password at the prompt; nothing is saved to a file or the shell history.
 - It refuses to run if any admin account already exists.
 - It creates no 2FA. Each person sets up 2FA at their first login ([WF-09B][wf-admin]).
-- The same script creates the production accounts once, run by the developer against production. How a first password reaches the Admin, and the script's audit entry, are [administration][wf-admin] open questions 8 and 9. The runbook goes in deployment and operations (planned: `07-operations/deployment-and-operations.md`).
+- The same script creates the production accounts once, run by the developer against production. Its "account created" audit entries use actor kind `system` and category `security` ([security][sec] §4.1; reconciled 2026-10-21). How a first password reaches the Admin is [administration][wf-admin] open question 8. The runbook goes in deployment and operations (planned: `07-operations/deployment-and-operations.md`).
 
 ### 10.5 Local conventions [P] (new in this doc)
 
@@ -705,7 +708,7 @@ The limits, their figures, and how each is reduced are owned by the batch-1 docs
 | The scheduler runs only daily | [NFR-06][nfr]; [FR-SYS-08][fr] | Every time-critical job runs in `pg_cron` (section 7) |
 | Runtime logs are kept only briefly | [NFR-23][nfr] | Sentry plus the audit log in the database |
 | No uptime promise | [NFR-04][nfr] | The Sentry uptime check on `/api/health` |
-| No skew protection: an open tab may call a server action from an older deploy **[U]** | [EC-02][ec]; [NFR-04][nfr] | The page catches "Failed to find Server Action" and asks the customer to reload; the draft and the duplicate key survive in `sessionStorage`; deploys happen off-hours |
+| No skew protection: an open tab may call a server action from an older deploy **[U]** | [EC-02][ec]; [NFR-04][nfr] | The page catches "Failed to find Server Action" and asks the customer to reload; the draft survives in `sessionStorage` and the duplicate key in `localStorage`; deploys happen off-hours |
 | Vendor terms not yet read in full | [NFR-08][nfr], O-08 | Read and saved before launch |
 
 ---
@@ -752,7 +755,7 @@ Also checked in that week: `updateTag` refreshing the catalog on Vercel, the "Fa
 Where they differ, the batch-1 docs win ([D-23][dl]). The spec is not edited. Differences that affect this document:
 
 1. **Job route names.** The stack research named the routes `/api/jobs/outbox` and `/api/cron/daily`. [FR-SYS-03][fr], [FR-SYS-08][fr], and [FR-SYS-09][fr] use `/api/jobs/tick` and `/api/jobs/daily`. This document follows FR-SYS.
-2. **What the daily Vercel run does.** The research put the retention purge and the keep-alive in the daily Vercel cron. [FR-SYS-04][fr] to [FR-SYS-07][fr] run them in `pg_cron` at 00:15 Manila, and [FR-SYS-08][fr] keeps the Vercel run as a backup sweep only. This document follows FR-SYS.
+2. **What the daily Vercel run does.** The research put the retention purge and the keep-alive in the daily Vercel cron. [FR-SYS-04][fr] to [FR-SYS-07][fr] run them in `pg_cron` from 00:15 Manila, and [FR-SYS-08][fr] keeps the Vercel run as a backup sweep only. This document follows FR-SYS.
 3. **Blocks.** The research stored blocks as rows in the same claim tables as bookings. Spec v0.2 §11 and [NFR-20][nfr] keep `blocks` and `block_resources`, with one unique index across bookings and blocks, and every block taking the capacity lock. This document follows NFR-20; [data-model][data] owns the tables.
 4. **QR tokens.** The research derived each token from a secret key, so the same QR could be drawn again without storing the token. [FR-PUB-08][fr] makes the token random, storing only its hash. This document follows FR-PUB-08 (open question 14).
 5. **Login lock and admin emails.** The research's Better Auth settings used a different lockout, and sent admins only the breaker email. [NFR-11][nfr] and [FR-NTF-13][fr] to [FR-NTF-15][fr] own these. The Better Auth configuration must follow them.
@@ -771,7 +774,7 @@ These are not decided here. If the reviewers agree an answer is needed, add it t
 2. **[P] (new in this doc) Migrations.** One folder, `supabase/migrations`, with drizzle-kit writing Supabase-named files into it **[U]** and the Supabase CLI applying them. Production migrations run from the developer's laptop through the session pooler, after CI passes, so the password of the database's `postgres` role is never stored in GitHub or Vercel (section 9). Confirm, or choose CI-run migrations instead.
 3. **[P] (new in this doc) Capacity-lock behaviour.** A lock wait that reaches `lock_timeout` returns "busy, please try again" instead of an error; and the fixed lock order (the capacity lock, then the reservation row, then its child rows) (section 6.4). Confirm in [api-specification][api].
 4. **[P] (new in this doc) The overlap guard for jobs.** [FR-SYS-09][fr] names an advisory lock, but a session-level advisory lock is unsafe through the transaction pooler. Proposal: a transaction-scoped try-lock in the SQL jobs, and a lease row for the two job routes (section 7.2). If accepted, FR-SYS-09's "(advisory lock)" should read "(advisory lock or lease)".
-5. **[P] (new in this doc) The outbox claim lease.** A claim pushes the row's next attempt forward by a short lease, so the `after()` sender, the tick, and the daily sweep never send one row at once (section 7.2). Spec v0.2 §11 lists no claimed-until column; [data-model][data] decides whether to reuse the next-attempt column or add one.
+5. **[P] (new in this doc) The outbox claim lease.** A claim pushes the row's next attempt forward by a short lease, so the `after()` sender, the tick, and the daily sweep never send one row at once (section 7.2). Resolved (reconciled 2026-10-21): [data-model][data] §5.12 reuses `next_attempt_at`; no claimed-until column.
 6. **[P] (new in this doc) The daily Vercel cron time:** `0 18 * * *` (02:00 Manila), after the daily SQL jobs (section 7.1).
 7. **[P] (new in this doc) The Sentry heartbeat.** A `pg_cron` job every 5 minutes checks `job_runs` and sends a `pg_net` check-in to the Sentry cron monitor, whose address is kept in Vault; plus a daily cleanup of `cron.job_run_details` after 7 days (sections 7.1 and 7.4). That log holds job results only, no personal data; add it to [privacy-and-retention][priv] §6.2 if every period should be listed there. [NFR-24][nfr] does not say who sends the heartbeat. Confirm the interval; the Sentry free plan's monitor count is **[U]**.
 8. **[P] (new in this doc) Environment variable names, and one job secret.** The names in section 8, and one `CRON_SECRET` shared by both job routes (as "the secret" in [FR-SYS-09][fr]), rather than one secret per route. One secret is simpler; two would let either caller be rotated alone.
@@ -780,11 +783,11 @@ These are not decided here. If the reviewers agree an answer is needed, add it t
 11. **The backup's heartbeat.** The backup role is read-only ([NFR-10][nfr]), so the nightly backup cannot write a `job_runs` record. Is GitHub's failure email enough, or should the health panel ([FR-ADM-33][fr]) show the last backup, which needs a narrow write grant or a separate check? ([security][sec])
 12. **[P] (new in this doc) An edge rate-limit rule.** Use Vercel Firewall's one rate-limit rule on the submit, status, and login paths as a backstop to the database limits of [NFR-11][nfr]. Whether one rule can cover several paths is **[U]** (week-1 test).
 13. **[P] (new in this doc) Local conventions and outage mode.** The local email, Turnstile, and tick-address conventions (section 10.5), and the outage steps (section 12.4). Related decision: should the exit option (A or B, section 12.3) be agreed in advance, so the developer can act on the same day? Paying for it is still a new decision ([NFR-01][nfr]).
-14. **QR token design.** [FR-PUB-08][fr] uses a random token, stored only as its hash, so a QR code can be shown only when it is created or reissued. The research instead derived the token from a secret key (adding a `QR_TOKEN_KEY` variable), so the status page could draw the same QR again. Which is wanted? It ties in with [booking-and-submission][wf-book] open question 11 (saving the QR code). ([security][sec], [api-specification][api])
+14. **QR token design.** Resolved (reconciled 2026-10-21): the random token of [FR-PUB-08][fr], stored only as its hash, with the request-received email's QR link encrypted under `OUTBOX_LINK_KEY` (option B of [security][sec] §4.5.4); no `QR_TOKEN_KEY`.
 15. **Mobile-number parsing.** The research suggests `libphonenumber-js` (with its full metadata), and notes that some valid Philippine mobile numbers may start with +638 **[U]**. [BR-11][br] accepts only +639 forms. Should the business-rules owner review BR-11, and should the library be used for normalization?
 16. **Better Auth's own rate limiter.** [NFR-11][nfr] and [NFR-13][nfr] keep IP addresses only as an HMAC. Whether Better Auth's built-in limiter stores raw IP addresses is **[U]**. If it does, login limits must use the database counters instead, and the built-in limiter is turned off. ([security][sec])
 
-Already open in other documents, and not repeated here: which actions take the capacity lock ([availability-and-conflicts][wf-avail] open question 2); how a database function knows who is acting, cached pages that show settings, and disabling that ends sessions at once ([administration][wf-admin] open questions 22, 15, and 4); the setup script's audit entry and how a first password reaches the Admin (open questions 9 and 8 there); how the server confirms an upload, and stray upload files ([notifications-and-tracking][wf-notify] open questions 14 and 17); how outbox rows are retained ([privacy-and-retention][priv] §11, question 3).
+Already open in other documents, and not repeated here: which actions take the capacity lock ([availability-and-conflicts][wf-avail] open question 2); how a database function knows who is acting, cached pages that show settings, and disabling that ends sessions at once ([administration][wf-admin] open questions 22, 15, and 4); how a first password reaches the Admin (open question 8 there); how the server confirms an upload, and stray upload files ([notifications-and-tracking][wf-notify] open questions 14 and 17); how outbox rows are retained ([privacy-and-retention][priv] §11, question 3).
 
 [dl]: ../00-project/decision-log.md
 [charter]: ../00-project/project-charter.md

@@ -102,7 +102,7 @@ Run this once for production, in this order. Run the same steps for the week-1 t
    5. Turn off sign-ups in Supabase Auth, which the app does not use ([D-20][dl]) **[P] (new in this doc)**.
    6. Apply the migrations from the developer's laptop through the session pooler, with the `postgres` password: `supabase link`, then `supabase db push` ([data-model][data] §10; [P] in [architecture][arch] open question 2). This creates the schemas, the roles and grants, the role timeouts, the functions, the seed rows, and the `pg_cron` schedules.
    7. Set the passwords of `app_rw` and the backup role by hand: long, random, stored as SCRAM. A password is never written in a migration file **[P] (new in this doc)** ([data-model][data] §2.2; [NFR-13][nfr]). Check the timeouts in `pg_roles.rolconfig` ([data-model][data] §2.3).
-   8. Create the Vault secrets by hand ([data-model][data] §10; names in [architecture][arch] §8.2): `job_route_secret` (the same value as `CRON_SECRET`, step 7), `tick_url`, and `sentry_checkin_url` (from step 6). Create the first IP-HMAC key by running the rotation function once, `select app.rotate_ip_key();` **[P] (new in this doc)** ([FR-SYS-06][fr]; where the key lives is open question 47).
+   8. Create the Vault secrets by hand ([data-model][data] §10; names in [architecture][arch] §8.2): `job_route_secret` (the same value as `CRON_SECRET`, step 7), `tick_url`, and `sentry_checkin_url` (from step 6). Create the first IP-HMAC key by running the rotation function once, `select app.rotate_ip_key();` **[P] (new in this doc)** ([FR-SYS-06][fr]). It writes the Vault secret `ip_hmac_key` ([data-model][data] §5.14).
    9. Create the private proof bucket, with the file types and size limit of [FR-PUB-12][fr] ([architecture][arch] §2.2).
    10. Keep the `postgres` password only on the developer's laptop and offline ([architecture][arch] §8.2).
 4. **Resend.**
@@ -288,7 +288,7 @@ Vercel keeps its runtime logs only briefly ([NFR-23][nfr]), so the `job_runs` ro
 ### 4.3 Running a job by hand
 
 - Each job is one database function ([api-specification][api] §5.9). From the SQL editor, as `postgres`: `select app.run_retention();` (after a restore, [FR-SYS-05][fr], [NFR-29][nfr]); `select app.expire_overdue_holds();`; `select app.request_tick();` to wake the email sender.
-- Two runs of one job never overlap ([FR-SYS-09][fr]), so a manual run next to a scheduled one is safe.
+- Two runs of one job never overlap ([FR-SYS-09][fr]), so a manual run next to a scheduled one is safe. The SQL jobs take a transaction try-lock; the two job routes take the job's row in `job_leases` (`lease_until`, `holder`; [data-model][data] §5.15; [api-specification][api] §4). A route run that crashed keeps its lease only until `lease_until` passes, so nothing needs clearing by hand.
 - **[P] (new in this doc):** never call a job route with `curl` from a shell, because the secret would stay in the shell history. Wake the tick from the database instead.
 - **[P] (new in this doc):** to pause one job, `select cron.alter_job(<jobid>, active := false);` and `active := true` to resume it. This is used during a restore (section 5.4).
 
@@ -734,7 +734,7 @@ Where the frozen [spec v0.2][spec] and the docs differ, the docs win ([D-23][dl]
 2. **What the nightly dump covers.** Spec §15 says the job dumps "the database". [Data-model][data] §2.2 gives the backup role read access to the `app` and `admin_auth` schemas only. This document follows the data model (section 5.1).
 3. **The exit runbook.** Spec §18 names one exit runbook for "Vercel Pro or a Node host". [Architecture][arch] §12.3 adds option C and does not recommend it. This document follows architecture (section 8).
 
-No other difference affects this document. Differences between the sibling docs are listed under open questions 47 to 50.
+No other difference affects this document. The differences between the sibling docs listed under open questions 47 to 50 were resolved on 2026-10-21.
 
 ---
 
@@ -817,12 +817,12 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Differences between sibling docs found while writing this one** (to be aligned by the owning docs)
 
-47. **Where the IP-HMAC key lives.** [Data-model][data] §5.14 keeps it as a Vault secret; [security][sec] §4.4 puts it in a table that only `app_owner` can read. The setup step (section 2, step 3.8) works either way once this is settled.
-48. **The daily job times.** [FR-SYS-04][fr] to [FR-SYS-07][fr] and [architecture][arch] §7.1 run the daily SQL jobs at one time; [api-specification][api] §6 spreads them over a few minutes ([P] there). This document links both and repeats neither.
-49. **How long `job_runs` rows are kept.** [Data-model][data] §5.15 proposes 14 days; [api-specification][api] §5.9 proposes 30 days, keeping the latest row per job. The database checks in section 4.2 work with either.
-50. **Job names in `job_runs`.** The `job_name` enum in [data-model][data] §3 (for example `expire_overdue_holds`, `send_emails`, `daily_sweep`) differs from the names [api-specification][api] §4 and §5.9 write (for example `expire`, `tick`, `daily`). The health panel and `app.check_heartbeat()` need one list.
+47. **Where the IP-HMAC key lives.** Resolved (reconciled 2026-10-21): the Vault secret `ip_hmac_key`, with the HMAC computed in the database ([data-model][data] §5.14; [security][sec] §4.4).
+48. **The daily job times.** Resolved (reconciled 2026-10-21): from 00:15 Manila, staggered to 00:35 ([api-specification][api] §6); [FR-SYS-04][fr] to [FR-SYS-07][fr] and [architecture][arch] §7.1 now say "from 00:15 Manila".
+49. **How long `job_runs` rows are kept.** Resolved (reconciled 2026-10-21): 30 days, keeping the latest row per job ([data-model][data] §5.15; [api-specification][api] §5.9).
+50. **Job names in `job_runs`.** Resolved (reconciled 2026-10-21): one list, the `job_name` enum of [data-model][data] §3, which holds the `pg_cron` job names of [api-specification][api] §6 plus `tick` and `daily` for the two job routes. The health panel and `app.check_heartbeat()` use it.
 
-**Already open in other documents, and not repeated here:** migrations from the developer's laptop, the heartbeat design, staging, the edge rate-limit rule, and agreeing the exit option in advance ([architecture][arch] open questions 2, 7, 9, 12, and 13); what admins do with a failed email ([notifications-and-tracking][wf-notify] open question 5); how long outbox rows are kept, erasures after a restore, the monthly copy in a 31-day month, and the GitHub and Cloudflare terms ([privacy-and-retention][priv] §11, questions 3, 7, 13, and 14); how a first password reaches the Admin, the break-glass audit entry, and who deletes a former admin's credentials ([administration][wf-admin] open questions 8, 9, and 11).
+**Already open in other documents, and not repeated here:** migrations from the developer's laptop, the heartbeat design, staging, the edge rate-limit rule, and agreeing the exit option in advance ([architecture][arch] open questions 2, 7, 9, 12, and 13); what admins do with a failed email ([notifications-and-tracking][wf-notify] open question 5); how long outbox rows are kept, erasures after a restore, the monthly copy in a 31-day month, and the GitHub and Cloudflare terms ([privacy-and-retention][priv] §11, questions 3, 7, 13, and 14); how a first password reaches the Admin and who deletes a former admin's credentials ([administration][wf-admin] open questions 8 and 11).
 
 [dl]: ../00-project/decision-log.md
 [charter]: ../00-project/project-charter.md

@@ -139,7 +139,7 @@ Every page in the MVP. "Who sees it" describes who can open the page; who may *d
 | P7 | Confirmation | Shown on `/book` after Submit | The customer who just submitted | Reference code, QR code, "Not yet confirmed", next steps | FR-PUB-07, FR-PUB-08 | Yes |
 | P8 | Status lookup | `/status` | Anyone | Reference code plus full mobile number | FR-PUB-10 | Yes |
 | P9 | Status page | Shown on `/status` after a lookup | The customer, after a successful lookup | Status, details, deadline, messages, documents, proof upload, new QR code | FR-PUB-11 to FR-PUB-14 | Yes |
-| P10 | Printable documents: Deposit Acknowledgment, Balance Payment Acknowledgment, Booking Confirmation | Set with the security doc ([FR §7][fr], question 5) | The customer, from the status page or the Confirmed email; either admin | A page to print or save | FR-PUB-14, FR-ADM-23 | Yes |
+| P10 | Printable documents: Deposit Acknowledgment, Balance Payment Acknowledgment, Booking Confirmation | Customer: `/status/acknowledgment/[paymentId]`, `/status/booking-confirmation`. Admin: under `/admin/reservations/[id]` ([api-specification][api] §2.10) | The customer, only after a status lookup, through the signed lookup cookie (a link in the Confirmed email opens the status lookup first); either admin, from the reservation page ([security][sec] §4.5.5; reconciled 2026-10-21) | A page to print or save | FR-PUB-14, FR-ADM-23 | Yes |
 | P11 | Privacy notice | `/privacy` | Anyone | The full privacy notice | FR-PUB-15 | Yes |
 | P12 | Contact and FAQ | `/contact` | Anyone | Contact details, how to cancel or reschedule, common questions | FR-PUB-16 | Yes |
 | P13 | QR link page | `/r/[token]` | Anyone who opens a QR code | "Present this at our office", or "not found / no longer valid", or the admin reservation page | FR-PUB-09 | Yes |
@@ -352,7 +352,7 @@ flowchart TD
 | Too many tries | "Too many tries. Please wait a while and try again, or message or call us." | [NFR-11][nfr]; proposal 7 |
 | Match | The status page (3.1.7) | [FR-PUB-11][fr] |
 
-**Developer notes.** The lookup is sent by a server action, never in the address bar: the reference code and the mobile number must not appear in URLs, browser history, or logs **[P] (new in this doc)** ([NFR-15][nfr]). How the page remembers a passed lookup for the upload and the new QR code is [notifications-and-tracking][wf-notify] open question 10.
+**Developer notes.** The lookup is sent by a server action, never in the address bar: the reference code and the mobile number must not appear in URLs, browser history, or logs **[P] (new in this doc)** ([NFR-15][nfr]). A passed lookup is remembered by a signed cookie for 15 minutes, which the upload, the new QR code, and the documents need ([security][sec] §4.5.2; [api-specification][api] §1.13; reconciled 2026-10-21).
 
 #### 3.1.7 Status page (P9)
 
@@ -394,7 +394,7 @@ flowchart TD
 | Uploading | The picture is re-saved on the phone first (removing hidden data such as the location), then a progress bar | [FR-PUB-12][fr], [NFR-14][nfr] |
 | Upload refused | One message per cause: wrong file type, file too big, no uploads left, too many tries, or the deadline has passed | [FR-PUB-12][fr], [EC-30][ec], [EC-32][ec], [NFR-11][nfr] |
 | Upload received | "Proof received. We will check it soon. Your booking is not confirmed yet." | [FR-PUB-12][fr] |
-| Lookup no longer remembered | "Please enter your reference code and mobile number again." (P8) | [notifications-and-tracking][wf-notify] open question 10 |
+| Lookup no longer remembered | "Please enter your reference code and mobile number again." (P8) | The 15-minute lookup cookie ([security][sec] §4.5.2) |
 
 **Developer notes.** Always live, never cached ([NFR-03][nfr]); Manila time whatever the phone's time zone ([NFR-19][nfr]). Customer-safe data only ([WF-07D][wf-notify], `app.lookup_status`). The upload re-encodes the image in the browser and sends it straight to the private bucket through the single-use link ([FR-PUB-12][fr]).
 
@@ -408,6 +408,7 @@ flowchart TD
 | Fixed statement | The statement required by [privacy-and-retention §7.1][priv], printed word for word at the bottom | [privacy-and-retention §7.1][priv] |
 | Booking Confirmation | Its contents are not defined yet ([catalog-and-payments §10][cat], question 6) | [catalog-and-payments §6][cat] |
 | Print button | "Print or save as PDF", hidden on the printed page | [FR-PUB-14][fr] |
+| Who can open it | The customer, only after a status lookup on this device; either admin, from the reservation page. Without either, the "not found" page | [security][sec] §4.5.5; [api-specification][api] §2.10 (reconciled 2026-10-21) |
 
 Layout: one column that reads well on a phone and fits one A4 or Letter page when printed. The titles and the words that must never appear are set in [privacy-and-retention §7.1][priv].
 
@@ -906,7 +907,7 @@ These are not decided here. If the reviewers agree, record each answer in the [d
 3. "Save QR code" on the confirmation and the status page (proposal 3).
 4. A "Staff login" link on the "present this at our office" page (proposal 4).
 5. The admin search details: name, mobile, date range, order, paging (proposal 5).
-6. Internal notes: no edit or delete, "Correction:" notes, 1,000 characters (proposal 6).
+6. Internal notes: no edit or delete, "Correction:" notes (proposal 6). The 1,000-character length: resolved (reconciled 2026-10-21); [data-model](../05-technical/data-model.md) §4 and [api-specification][api] §3.5 now use it.
 7. One message for any failed lookup, another for the rate limit (proposal 7).
 8. The prepared-message panel, the prepared reminder, and the **No email** tag (proposal 8).
 9. Calendar labels stay visible, but cannot be picked, while online booking is paused (proposal 9).
@@ -928,11 +929,11 @@ These are not decided here. If the reviewers agree, record each answer in the [d
 
 **C. Open elsewhere, and needed before some screens can be finished.**
 
-- What the status page shows as the deadline while expiry is paused ([FR §7][fr], question 2); how the document links are protected, which sets the route of the printable pages ([FR §7][fr], question 5); whether the venue street and landmarks are required ([FR §7][fr], question 6).
+- What the status page shows as the deadline while expiry is paused ([FR §7][fr], question 2); whether the venue street and landmarks are required ([FR §7][fr], question 6). How the document links are protected ([FR §7][fr], question 5): resolved (reconciled 2026-10-21): only after a status lookup, or for an admin ([security][sec] §4.5.5), which sets the routes of P10.
 - Whether the name is required, and the QR code on a repeat submission ([booking-and-submission][wf-book] open questions 7 and 2).
 - Whether a voided acknowledgment stays linked on the status page, and what the Booking Confirmation shows ([catalog-and-payments §10][cat], questions 5 and 6).
 - On which statuses a QR code can be reissued, by an admin or by the customer ([lookup-and-review][wf-review] open question 7; [notifications-and-tracking][wf-notify] open question 13).
-- How the status page remembers a passed lookup, and a second upload while a proof is under review ([notifications-and-tracking][wf-notify] open questions 10 and 15).
+- A second upload while a proof is under review ([notifications-and-tracking][wf-notify] open question 15). How the status page remembers a passed lookup (open question 10 there): resolved (reconciled 2026-10-21): a signed cookie for 15 minutes ([security][sec] §4.5.2).
 - How a first or reset password is handed over, which values each setting accepts, and how the erasure tool checks the requester ([administration][wf-admin] open questions 8, 13, and 20).
 - How soon counts as "soon" for the dashboard's deadline alerts ([FR-ADM-02][fr], to be set while building).
 - The content items O-02 (slot times and on-site hours), O-03 (packages, prices, deposit, instructions, terms), O-04 (free-delivery wording), O-05 (domain and published addresses), and O-09 (privacy contact).
@@ -953,4 +954,6 @@ These are not decided here. If the reviewers agree, record each answer in the [d
 [wf-change]: ../03-workflows/changes-and-expiry.md
 [wf-notify]: ../03-workflows/notifications-and-tracking.md
 [wf-admin]: ../03-workflows/administration.md
+[api]: ../05-technical/api-specification.md
+[sec]: ../05-technical/security.md
 [spec]: ../superpowers/specs/2026-10-21-kasoundbox-design.md

@@ -387,7 +387,7 @@ These hold for every action below, so the procedures do not repeat them ([FR-ADM
 6. Save. The status becomes **Confirmed**, and a **Deposit Acknowledgment** is made with its own number, for example `ACK-2026-0001`.
 7. If the customer wants a paper copy, press **"Print documents"** and print the acknowledgment.
 
-**What the customer sees.** The confirmed email, with links to the acknowledgment and the Booking Confirmation ([FR-NTF-07][fr]). Their status page shows **Confirmed**, the balance due, and the document links.
+**What the customer sees.** The confirmed email, with links to the acknowledgment and the Booking Confirmation ([FR-NTF-07][fr]); the links open the status page, and the documents show after the customer enters the reference code and mobile number ([security](../05-technical/security.md) §4.5.5). Their status page shows **Confirmed**, the balance due, and the document links.
 
 **What to check.**
 
@@ -423,7 +423,7 @@ These hold for every action below, so the procedures do not repeat them ([FR-ADM
    - **Note:** optional. Never the payer's name or account number.
 6. Save. The status becomes **Confirmed**, and `ACK-2026-0001` (for example) appears on the customer's status page.
 
-**What the customer sees.** The confirmed email with links to the acknowledgment and the Booking Confirmation ([FR-NTF-07][fr]); **Confirmed** on the status page.
+**What the customer sees.** The confirmed email with links to the acknowledgment and the Booking Confirmation, which open after a status lookup ([FR-NTF-07][fr]; [security](../05-technical/security.md) §4.5.5); **Confirmed** on the status page.
 
 **What to check.**
 

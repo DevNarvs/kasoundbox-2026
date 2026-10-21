@@ -130,7 +130,7 @@ Until Messenger is built, customers without email rely on the status page, and a
 | 6. Test | Planned | Automated tests check the database rules, the code, full customer and admin journeys at phone and desktop size, and security. Then both admins work through a checklist of real scenarios, and the restore test is repeated. | Both admins accept the checklist, and the restore test passes. |
 | 7. Launch | Planned | The website opens to customers. | Before launch, the vendor terms are read and saved, and a Philippine lawyer reviews privacy and retention (O-08). The other open items are tracked in the [decision log](decision-log.md). |
 
-Detailed tasks, their order, and dates are in the roadmap (batch 4). Test cases are in the test plan (batch 4).
+The phase order, milestones, and gates are in the roadmap (batch 4), with no calendar dates. Test cases are in the test plan (batch 4).
 
 ## 7. Where to find details
 

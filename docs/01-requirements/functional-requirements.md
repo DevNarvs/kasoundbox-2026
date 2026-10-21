@@ -221,7 +221,7 @@ Before sending, the customer checks a summary. On Submit, the server checks ever
 - **Other refusals.** When a hold limit is reached (BR-07), online booking is paused (BR-07a), or the start is too soon (BR-06), the request is refused with a clear message. The form keeps the customer's data.
 - **While paused**, the form shows "please message or call us" instead of accepting requests (BR-07a).
 - **No accidental duplicates.** A double click, a retry after a network error, or a second browser tab returns the same reservation and reference code. It never creates a second reservation.
-- **New website version.** If a new version of the website goes live while the form is open, the page asks the customer to reload. Their draft and the duplicate-submission key are kept in the browser session, so nothing is lost or sent twice.
+- **New website version.** If a new version of the website goes live while the form is open, the page asks the customer to reload. Their draft (kept in this tab's session storage) and the duplicate-submission key (kept in the browser's local storage, so a second tab shares it) survive the reload, so nothing is lost or sent twice [P] (reconciled 2026-10-21; see [api-specification](../05-technical/api-specification.md) §1.7).
 - **Bot protection.** Submit requires the Cloudflare Turnstile check. A hidden "honeypot" field catches simple bots. Too many submissions from one internet address are refused for a while (rate limits: [non-functional-requirements](non-functional-requirements.md) NFR-11).
 - **Emails queued:** request received to the customer, if an email was given (FR-NTF-01), and new online request to both admins (FR-NTF-13).
 - The submission is recorded in the audit log, with the actor "customer" (FR-ADM-32).
@@ -344,7 +344,7 @@ The customer can open and print their payment acknowledgments and their booking 
 
 **Acceptance criteria**
 - The status page links to each payment acknowledgment (one per recorded deposit or balance payment) and to the booking confirmation.
-- The Confirmed email links to them too (FR-NTF-07).
+- The Confirmed email links to them too (FR-NTF-07). The link leads to the status page: the documents open only after a status lookup (reference code + full mobile), or for an admin from the admin panel [P] (reconciled 2026-10-21; see [security](../05-technical/security.md) §4.5.5).
 - Each one is a printable web page that can be printed or saved from a phone or computer browser.
 - What each one contains, and how acknowledgments are numbered (`ACK-YYYY-NNNN`), is defined only in [catalog-and-payments](../02-domain/catalog-and-payments.md). The words they must never use, such as "Official Receipt", are in [privacy-and-retention](privacy-and-retention.md).
 
@@ -953,14 +953,14 @@ The free email plan limits how many emails can be sent.
 | Every minute | Expire overdue holds (not paused) | Supabase Cron (SQL) | FR-SYS-01 |
 | Every minute | Queue deposit reminders that are due | Supabase Cron (SQL) | FR-SYS-02 |
 | Every minute, when emails are waiting | Call `/api/jobs/tick` to send or retry emails | Supabase Cron → Vercel | FR-SYS-03 |
-| Daily, 00:15 Manila | Mark finished events Completed | Supabase Cron (SQL) | FR-SYS-04 |
-| Daily, 00:15 Manila | Retention job | Supabase Cron (SQL) | FR-SYS-05 |
-| Daily, 00:15 Manila | Rotate the IP key | Supabase Cron (SQL) | FR-SYS-06 |
-| Daily, 00:15 Manila | Keep-alive query | Supabase Cron (SQL) | FR-SYS-07 |
+| Daily, from 00:15 Manila | Mark finished events Completed | Supabase Cron (SQL) | FR-SYS-04 |
+| Daily, from 00:15 Manila | Retention job | Supabase Cron (SQL) | FR-SYS-05 |
+| Daily, from 00:15 Manila | Rotate the IP key | Supabase Cron (SQL) | FR-SYS-06 |
+| Daily, from 00:15 Manila | Keep-alive query | Supabase Cron (SQL) | FR-SYS-07 |
 | Daily | Backup sweep: `/api/jobs/daily` | Vercel Cron | FR-SYS-08 |
 | Nightly | Encrypted database backup | GitHub Actions (private repository) | FR-SYS-12 |
 
-*For the developer:* the daily jobs run at 00:15 Manila time (`15 16 * * *` in UTC) and work out "today" with `now() AT TIME ZONE 'Asia/Manila'` (spec v0.2 §12). The monthly offline backup copy is a task for a person, not a job ([non-functional-requirements](non-functional-requirements.md) NFR-28).
+*For the developer:* the daily jobs run from 00:15 Manila time (`15 16 * * *` in UTC), a few minutes apart, as [api-specification](../05-technical/api-specification.md) §6 sets, and work out "today" with `app.manila_today()` (Manila date from `clock_timestamp()`; see [data-model](../05-technical/data-model.md)), following spec v0.2 §12. The monthly offline backup copy is a task for a person, not a job ([non-functional-requirements](non-functional-requirements.md) NFR-28).
 
 ### FR-SYS-01 · Expire overdue holds (every minute)
 

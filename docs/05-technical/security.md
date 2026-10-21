@@ -190,7 +190,7 @@ STRIDE groups threats into six kinds: **S**poofing (pretending to be someone), *
 | TM-28 | I | The QR token leaks through the Referer header, search engines, a cache, or a shared device | `/r/` page | `no-referrer`, `noindex`, `no-store`, no third-party content **[P]** (§4.5.3) | [NFR-13][nfr], [FR-PUB-09][fr] | test-plan (batch 4) |
 | TM-29 | I | Raw IP addresses stored by the login library | Better Auth tables | HMAC keys for the limiter; IP removed from session rows **[P]** **[U]** (§4.1) | [NFR-11][nfr], [NFR-13][nfr] | test-plan (batch 4) |
 | TM-30 | D | Fake requests hold every set and the room (denial of inventory) | Booking | Turnstile, honeypot, rate limit, hold limits, breaker; admins reject fakes (§4.4) | [NFR-12][nfr], [BR-07][br], [BR-07a][br], [EC-14][ec] | test-plan (batch 4) |
-| TM-31 | D | Someone trips the breaker on purpose to pause online booking | Booking | The per-IP limit slows it; one email to both admins; either admin resumes early; staff bookings still work; accepted residual risk (§4.4) | [BR-07a][br], [EC-15][ec] | test-plan (batch 4) |
+| TM-31 | D | Someone trips the breaker on purpose to pause online booking | Booking | The per-IP limit slows it; one email to each admin; either admin resumes early; staff bookings still work; accepted residual risk (§4.4) | [BR-07a][br], [EC-15][ec] | test-plan (batch 4) |
 | TM-32 | D | A flood uses up a Vercel Hobby allotment and the project is paused | Vercel | Static catalog, no polling, cheap checks first, edge rule **[P]**, Attack Mode (§4.4) | [NFR-06][nfr], [NFR-11][nfr] | test-plan (batch 4) |
 | TM-33 | D | A slow query or a held lock freezes bookings | Postgres | The capacity lock lives only inside one function call; role timeouts **[P]** (§4.3) | [NFR-20][nfr], [NFR-21][nfr] | test-plan (batch 4) |
 | TM-34 | D | Someone locks an admin out, or blocks a customer's lookups, on purpose | Login, status lookup | Locks are temporary; a reset by the Super Admin clears an account lock **[P]**; the customer can contact the business (§4.1, §4.5.2) | [NFR-11][nfr] | test-plan (batch 4) |
@@ -306,7 +306,7 @@ The break-glass script resets the Super Admin's 2FA when he has no device and no
 - It runs from the developer's own computer, through the session pooler, with the password of the database's `postgres` role. That password lives only on the developer's laptop and offline. It is never stored in GitHub or Vercel ([architecture][arch] §8.2).
 - In one transaction it removes the Super Admin's two-factor rows, and writes one audit entry.
 - **[P] (new in this doc):** it also ends all of the Super Admin's sessions, for example on the lost phone. It can also set a new password hash for a forgotten password. Its audit entry uses the actor kind "system" and the category "security", with the reason "break-glass" ([administration][wf-admin] open question 9).
-- **[P] (new in this doc):** the setup script that creates the first two accounts writes "account created" audit entries with the actor kind "system".
+- **[P] (new in this doc):** the setup script that creates the first two accounts writes "account created" audit entries with the actor kind "system" and the category "security", like the break-glass script (reconciled 2026-10-21; [api-specification][api] §3.8).
 - The step-by-step runbook will be in the operations docs (planned: `07-operations/deployment-and-operations.md`).
 
 ### 4.2 Authorization
@@ -372,8 +372,8 @@ Implements [NFR-10][nfr], [NFR-21][nfr], and [NFR-22][nfr]. The per-table grants
 | Role | Logs in? | Used by | Can do |
 |---|---|---|---|
 | `app_owner` | No (`NOLOGIN`) | Owns the `app` schema, its tables, and its `SECURITY DEFINER` functions | Everything inside `app`. Nobody logs in as it |
-| `app_rw` | Yes: SCRAM-SHA-256 password, no `VALID UNTIL` | The website, through the transaction pooler | `EXECUTE` on the app's entry-point functions only; `SELECT` on the read views; read and write on the Better Auth tables, which the adapter needs. No `INSERT`, `UPDATE`, or `DELETE` on any business table |
-| Backup role (read-only) | Yes | The nightly backup, through the session pooler | `SELECT` only, with read-only transactions ([NFR-10][nfr], [FR-SYS-12][fr]) |
+| `app_rw` | Yes: SCRAM-SHA-256 password, no `VALID UNTIL` | The website, through the transaction pooler | `EXECUTE` on the app's entry-point functions only; `SELECT` on the tables and views that [data-model][data] §2.2 lists; read and write on the Better Auth tables, which the adapter needs. No `INSERT`, `UPDATE`, or `DELETE` on any business table |
+| `app_backup` (read-only) | Yes | The nightly backup, through the session pooler | `SELECT` only, with read-only transactions ([NFR-10][nfr], [FR-SYS-12][fr]) |
 | `postgres` | Yes | Migrations and the break-glass script, from the developer's laptop | Everything. The password is never in Vercel or GitHub |
 | `anon`, `authenticated` | Through Supabase's APIs | Nothing | No grants on `app` or on the Better Auth tables |
 
@@ -386,13 +386,13 @@ Implements [NFR-10][nfr], [NFR-21][nfr], and [NFR-22][nfr]. The per-table grants
 
 ```sql
 -- indicative; final grants in data-model
-create function app.approve_reservation(p_actor uuid, p_id uuid, p_version int)
+create function app.approve_reservation(p_actor_id text, p_reservation_id uuid, p_expected_version int)
   returns jsonb language plpgsql
   security definer set search_path = ''      -- every name is schema-qualified inside
 as $$ ... $$;
 revoke execute on all functions in schema app from public;
 alter default privileges for role app_owner in schema app revoke execute on functions from public;
-grant execute on function app.approve_reservation(uuid, uuid, int) to app_rw;
+grant execute on function app.approve_reservation(text, uuid, int) to app_rw;
 ```
 
 - Every definer function sets `search_path = ''` and names every table, function, and operator with its schema (for example `pg_catalog.now()`). A table someone creates elsewhere can then never be picked up instead of the real one (TM-38).
@@ -443,20 +443,20 @@ Implements [NFR-11][nfr] and [NFR-12][nfr], with the hold limits and the breaker
 
 **Honeypot.** A hidden field that people never see. It sits off-screen, hidden from screen readers and from the keyboard (`aria-hidden`, `tabindex="-1"`, `autocomplete="off"`). A filled honeypot means a bot.
 
-**The order of the checks [P] (new in this doc).** This answers [booking-and-submission][wf-book] open question 5. The cheapest checks run first, so a flood costs as little as possible:
+**The order of the checks [P] (reconciled 2026-10-21).** This answers [booking-and-submission][wf-book] open question 5, in the order of [api-specification][api] §2.3. The cheapest checks run first, so a flood costs as little as possible:
 
-1. **Submission rate limit** ([NFR-11][nfr]), counted in one database statement. **Every attempt counts**, including a repeat with the same duplicate key. A customer who reaches the limit is told to message or call.
-2. **Honeypot.**
-3. **Turnstile siteverify.**
-4. **Field validation** with the shared Zod schema, and the mobile number converted to its standard form ([BR-11][br]).
-5. **One call to the booking function**, which runs the order fixed in [BR-09][br] (developer note): the capacity lock, the duplicate key, overdue holds, notice, hold limits and the breaker, a set or the room, then add-on stock.
+1. **Honeypot.**
+2. **Submission rate limit** ([NFR-11][nfr]), counted in one database statement. **Every attempt counts**, including a repeat with the same duplicate key. A customer who reaches the limit is told to message or call.
+3. **Field validation** with the shared Zod schema, and the mobile number converted to its standard form ([BR-11][br]).
+4. **Turnstile siteverify.**
+5. **One call to the booking function** (`app.book_reservation`), which runs the order fixed in [BR-09][br] (developer note): the capacity lock, the duplicate key, overdue holds, notice, hold limits and the breaker, a set or the room, then add-on stock.
 
-A request caught at step 2 or 3 sees one generic message: "We could not check that this request came from a person. Please try again, or message or call us." It never says which check failed **[P] (new in this doc)**.
+A request caught at step 1 or 4 sees one generic message: "We could not check that this request came from a person. Please try again, or message or call us." It never says which check failed **[P] (new in this doc)**.
 
 **Rate limits.**
 
 - The numbers are in [NFR-11][nfr]. The counters live in the database, keyed by an HMAC of the IP address with the daily key of [FR-SYS-06][fr], and are deleted on the [privacy-and-retention][priv] §6.2 schedule.
-- **The IP-HMAC key** lives in a table that only `app_owner` can read. It is rotated by the daily SQL job, and old keys are destroyed ([FR-SYS-06][fr]). The server passes the raw IP to the database function, which makes the HMAC; the raw IP is never stored.
+- **The IP-HMAC key** lives in Supabase Vault as the secret `ip_hmac_key`, which only the database functions read ([data-model][data] §5.14; **[P] (reconciled 2026-10-21)**). The daily SQL job rotates it by overwriting it, so old keys are destroyed ([FR-SYS-06][fr]). The server passes the raw IP to the database function, which makes the HMAC; the app never holds the key, and the raw IP is never stored.
 - **The trusted client-IP header.** One helper reads the client IP from the header that Vercel itself sets, and every limit, Better Auth, and Turnstile use that helper. Which header to trust (`x-forwarded-for`, `x-real-ip`, or `x-vercel-forwarded-for`) is **[U]** (week-1 test). A header the client can set would let an attacker invent a new IP for every request (TM-05).
 - **Shared addresses.** Many Philippine mobile users may share one public IP address (carrier-grade NAT) **[U]**. So the per-IP limits stay loose, and the per-mobile hold limits and per-reference-code limits do the precise work.
 - **An edge backstop [P] (new in this doc).** Vercel Firewall's one rate-limit rule covers POST requests to the booking, status, and sign-in paths. Requests it blocks do not count toward the Hobby allotments. Whether one rule can cover several paths is **[U]** ([architecture][arch] open question 12). During a flood, the Super Admin turns on Attack Mode, and off again afterwards: it also blocks Vercel Cron.
@@ -474,7 +474,7 @@ A request caught at step 2 or 3 sees one generic message: "We could not check th
 - **Where it is kept.** The key is kept in `localStorage`, which every tab of the same browser shares, so a second tab sends the same key ([EC-01][ec]). The draft itself, which holds personal data, stays in `sessionStorage` (one tab), so it does not stay behind on a shared phone. The confirmation page clears the key, so the next booking gets a new one.
 - **What the server keeps.** Only a hash of the key ([FR-PUB-06][fr]), with a fingerprint: a hash of the request's main fields (service type, date, package, add-ons, and the standard-form mobile number). Both are deleted on the [privacy-and-retention][priv] §6.2 schedule.
 - **A repeat with the same key and the same fingerprint** returns the same reservation and reference code ([EC-01][ec]). This is safe, because only that browser knows the key.
-- **The same key with a different fingerprint** (for example, the date was changed after a network error) is refused with "This looks like a new booking. Please check your earlier request on the status page, or start again." The browser then makes a new key. The earlier request stands.
+- **The same key with a different fingerprint** (for example, the date was changed after a network error) is refused with the result code `submission_key_mismatch` ([api-specification][api] §1.7, §1.8) and the message "This looks like a new booking. Please check your earlier request on the status page, or start again." The browser then makes a new key. The earlier request stands.
 - **What the repeat shows instead of the QR code** is [booking-and-submission][wf-book] open question 2. It depends on the QR design chosen in section 4.5.4.
 
 **Emails to strangers.** Someone could type another person's email address into the form, so that person gets a request-received email (TM-35). The rate limits and the breaker cap how often this can happen, the caps of [FR-NTF-20][fr] protect the email allowance, and the email holds only the booking summary and no admin data.
@@ -502,7 +502,7 @@ Implements [FR-PUB-08][fr] to [FR-PUB-14][fr], [NFR-11][nfr], [NFR-13][nfr], and
 - **One generic message [P] (new in this doc).** A wrong code and a wrong mobile number show the same message: "We could not find a booking with that reference code and mobile number." The limit message is different but just as generic: "Too many tries. Please wait a while, or message or call us." Both paths do the same database work, so the response time does not give the answer away ([notifications-and-tracking][wf-notify] open question 12).
 - **Turnstile on the lookup form [P] (new in this doc).** The same robot check as the booking form. It makes scripted guessing from many addresses harder. Spec v0.2 §13 and [NFR-12][nfr] name Turnstile only for the booking form.
 - **The lookup session [P] (new in this doc).** This answers [notifications-and-tracking][wf-notify] open question 10.
-  - After a successful lookup, the server sets a cookie holding the reservation ID and an expiry time, signed with an HMAC (key `STATUS_COOKIE_KEY`). It is HttpOnly, Secure, and SameSite=Strict, limited to the `/status` path (the customer's document pages sit under it), and lasts 15 minutes.
+  - After a successful lookup, the server sets a cookie holding the reservation ID and an expiry time, signed with an HMAC (key `STATUS_COOKIE_KEY`). It is HttpOnly, Secure, and SameSite=Lax, limited to the `/status` path (the customer's document pages sit under it), and lasts 15 minutes (reconciled 2026-10-21; [api-specification][api] §1.13 uses the same flags).
   - The proof upload (section 4.6), the QR reissue, and the document pages (section 4.5.5) require it.
   - Each of those actions still checks the status and the deadline in the database.
   - Nothing is stored on the server, so no new retention row is needed.
@@ -534,7 +534,7 @@ Implements [FR-PUB-08][fr] to [FR-PUB-14][fr], [NFR-11][nfr], [NFR-13][nfr], and
 | **C. Derived token** | token = HMAC(key, reservation ID + token version), worked out again whenever it is needed. Only the hash and the version are stored | A copy of the database alone reveals nothing. But the key together with the reservation IDs reveals every live QR link, and changing the key changes every customer's QR code unless key versions are kept | The QR code can be shown again: on a repeat submission, for a staff booking without email, and after an admin reissue | [FR-PUB-08][fr] and [NFR-13][nfr] say "random bits": a decision is needed |
 | **D. Reference code and status link only** | The email carries the reference code and a link to the status page, but no QR link | Nothing secret in the outbox | A customer who closed the confirmation page must get a new QR code on the status page | [FR-NTF-01][fr] is **[C]**: needs a decision-log change |
 
-**Proposal: option B.** It keeps every batch-1 rule as it is, and it limits what a leak can show to the emails still waiting.
+**Proposal: option B** (chosen, reconciled 2026-10-21). It keeps every batch-1 rule as it is, and it limits what a leak can show to the emails still waiting. In the data model, the ciphertext is the outbox column `qr_link_ciphertext`, and the token's version is the reservation's `qr_issued_at` ([data-model][data] §5.3, §5.12); the function contracts are in [api-specification][api] §1.13.
 
 - **Who makes the token.** Option B needs the server, not the database, to make the token before the call; [WF-02][wf-book] allows either. The same applies to staff-created and recreated requests, which also send the request-received email ([FR-NTF-01][fr]).
 - **Encryption.** AES-256-GCM with a fresh random nonce per row. The associated data is the outbox row ID and the reservation ID, so a ciphertext cannot be moved to another row. The key, `OUTBOX_LINK_KEY` (32 random bytes), is a Vercel production secret; previews get none. The database never sees the key.
@@ -571,13 +571,13 @@ sequenceDiagram
 
 **The problem.** The Confirmed email links to the acknowledgment and the Booking Confirmation ([FR-NTF-07][fr]). An acknowledgment shows the customer's name, the amount, and the e-wallet reference ([catalog-and-payments][cat] §5.3). A link that opens the document on its own would show all of that to anyone who holds the email, for example after it is forwarded, or if the mailbox is broken into. This is [functional-requirements][fr] §7 question 5 and [catalog-and-payments][cat] §5.4.
 
-**Proposal.**
+**Proposal** (chosen, reconciled 2026-10-21; [api-specification][api] §1.13, §2.10).
 
-- The document pages open only for a logged-in admin ([FR-ADM-23][fr]), or for a browser with a valid lookup session for that reservation (section 4.5.2).
+- The document pages open only for a logged-in admin ([FR-ADM-23][fr]), from the admin panel, or for a browser with a valid lookup session for that reservation (section 4.5.2).
 - The links in the email point to the status page, with the reference code and the document named after a `#`. Browsers never send that part of a URL to the server, and never put it in a Referer header.
 - The page fills in the reference code, the customer types the full mobile number, and the document opens.
 - **Trade-offs.** One extra step for the customer. No new token to store or protect. A forwarded email or a broken-into mailbox alone does not open the documents. The reference code is in the email body anyway.
-- **Alternative:** a signed link per document that expires (an HMAC with a server key, nothing stored). One tap for the customer, but anyone who holds the email can open the document until the link expires.
+- **Alternative, not chosen:** a signed link per document that expires (an HMAC with a server key, nothing stored). One tap for the customer, but anyone who holds the email can open the document until the link expires.
 
 #### 4.5.6 Admin scanning and the screenshot fallback
 
@@ -636,7 +636,7 @@ Implements [NFR-13][nfr]. The names follow [architecture][arch] §8.
 | `STATUS_COOKIE_KEY` **[P] (new in this doc)** | Vercel, production | The lookup session cookie (section 4.5.2) | Previews |
 | `SENTRY_AUTH_TOKEN` | Vercel, build only | Uploading source maps (optional) | Runtime code |
 | `BACKUP_DATABASE_URL` (the read-only role) | GitHub Actions secret | The nightly backup | Vercel |
-| The IP-HMAC keys | A database table only `app_owner` can read | The rate-limit functions ([FR-SYS-06][fr]) | Vercel, logs |
+| The IP-HMAC key | Supabase Vault (`ip_hmac_key`, [data-model][data] §5.14) | The rate-limit functions in the database ([FR-SYS-06][fr]) | Vercel, the app, logs |
 | The `postgres` role's password | The developer's laptop and offline | Migrations, break-glass | Vercel, GitHub |
 | The `age` private key | Offline only (section 4.12) | A restore | Every online system |
 | Provider recovery codes; admin backup codes | Offline, on paper | Recovering an account | Phones, email, chats |
@@ -657,7 +657,7 @@ Implements [NFR-13][nfr]. The names follow [architecture][arch] §8.
 **Vault for the `pg_net` secret.**
 
 - The every-minute job reads the bearer secret and the tick address from `vault.decrypted_secrets` at call time ([architecture][arch] §7.4).
-- **[P] (new in this doc):** only the `postgres` role can read that view; `app_rw` cannot.
+- **[P] (new in this doc):** only the `postgres` role can read that view, plus `app_owner`, whose definer functions read the IP-HMAC key (reconciled 2026-10-21; [data-model][data] §5.14); `app_rw` cannot.
 - Whether `pg_cron`, `pg_net`, and Vault are all available on Supabase Free is **[U]** (week-1 item 4).
 - **One shared secret.** One `CRON_SECRET` serves both job routes, as [architecture][arch] open question 8 proposes; this document agrees. Two secrets would let each caller be rotated alone, but would add a second value to keep in step.
 
@@ -936,7 +936,7 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 4. **[P] Passwords** (section 4.1): at least 12 characters; system-made first and reset passwords handed over in person; changing your own password needs the current one; no "forgot password" link; the break-glass script for a forgotten Super Admin password. Should a first or reset password also have to be changed at the next login? Better Auth has no built-in flag for that. Answers [administration][wf-admin] open question 8. Update [roles-and-permissions][roles] §5.1.
 5. **[P] Backup codes** (section 4.1): ten codes, shown once; a new set needs the password and a code, and ends the old set; stored encrypted rather than hashed. Answers [administration][wf-admin] open question 7 (the count and the new-set rule). Update [roles-and-permissions][roles] §5.2, and the "hashed where stored" wording of [NFR-13][nfr].
 6. **[P] Sign out** (section 4.1): the Super Admin's sign-out ends all of that admin's sessions; each admin can end their own other sessions. Answers [administration][wf-admin] open question 10. Update [roles-and-permissions][roles] §5.1.
-7. **[P] Break-glass and the setup script** (section 4.1): actor kind "system", category "security"; the script also ends the Super Admin's sessions and can set a new password; the setup script audits the first accounts. Answers [administration][wf-admin] open question 9. Update [roles-and-permissions][roles] §5.2 and [FR-ADM-32][fr].
+7. **[P] Break-glass and the setup script** (section 4.1): the script also ends the Super Admin's sessions and can set a new password; the setup script audits the first accounts. Answers [administration][wf-admin] open question 9. Update [roles-and-permissions][roles] §5.2 and [FR-ADM-32][fr]. Resolved (reconciled 2026-10-21): both scripts' entries use actor kind "system" and category "security", and [api-specification][api] §3.8 now says so.
 8. **[P] Better Auth endpoint allow-list, and account changes through the app's own functions** (sections 4.1, 4.2). Confirm in [api-specification][api].
 9. **[P] No raw IP addresses in Better Auth** (section 4.1): HMAC-keyed limiter storage, or the limiter off; the IP removed from session rows. Answers [architecture][arch] open question 16, pending the **[U]** check.
 10. **[P] Minimum versions** (sections 4.1 and 4.10): Better Auth 1.7.7 and `sharp` 0.35.5, checked in CI. Add to [NFR-30][nfr] or [architecture][arch].
@@ -950,9 +950,9 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Status lookup, QR, and documents**
 
-15. **[P] The QR link in the request-received email: option B** (section 4.5.4), or option C if the QR code should be shown again. Answers [booking-and-submission][wf-book] open question 1 and [architecture][arch] open question 14. Option C would change [FR-PUB-08][fr] and [NFR-13][nfr]; option D would change [FR-NTF-01][fr], which is **[C]**.
-16. **[P] Document links that open only after a lookup** (section 4.5.5). Answers [functional-requirements][fr] §7 question 5 and [catalog-and-payments][cat] §5.4. Update [FR-NTF-07][fr] and [FR-PUB-14][fr].
-17. **[P] The lookup session** (section 4.5.2): a signed cookie for 15 minutes, needed for uploads, reissues, and documents. Answers [notifications-and-tracking][wf-notify] open question 10.
+15. **The QR link in the request-received email** (section 4.5.4). Resolved (reconciled 2026-10-21): option B, the link encrypted in `qr_link_ciphertext` and erased once sent or once the QR code stops working; this answers [booking-and-submission][wf-book] open question 1 and [architecture][arch] open question 14.
+16. **Document links that open only after a lookup** (section 4.5.5). Resolved (reconciled 2026-10-21): only through the signed lookup cookie, or for an admin from the admin panel; this answers [functional-requirements][fr] §7 question 5 and [catalog-and-payments][cat] §5.4. [FR-NTF-07][fr] and [FR-PUB-14][fr] still need the matching update.
+17. **The lookup session** (section 4.5.2). Resolved (reconciled 2026-10-21): a signed cookie for 15 minutes, HttpOnly, Secure, SameSite=Lax, needed for uploads, reissues, and documents; this answers [notifications-and-tracking][wf-notify] open question 10.
 18. **[P] The failed-lookup counter keyed on the reference code alone** (section 4.5.2). Answers [notifications-and-tracking][wf-notify] open question 11. Update the details of [NFR-11][nfr].
 19. **[P] One generic message for a failed lookup, and another for the limits** (section 4.5.2). Answers [notifications-and-tracking][wf-notify] open question 12.
 20. **[P] Turnstile on the status lookup** (section 4.5.2). Update [NFR-12][nfr] and [FR-PUB-10][fr].
@@ -962,12 +962,12 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Public form and uploads**
 
-24. **[P] The order of the first checks, every attempt counting toward the submission limit, and one generic bot-check message** (section 4.4). Answers [booking-and-submission][wf-book] open question 5.
-25. **[P] Duplicate-submission keys** (section 4.4): the key in `localStorage`, the draft in `sessionStorage`, a fingerprint stored with the key's hash, and the same key with other data refused. Answers [booking-and-submission][wf-book] open question 3. Update the "browser session" wording of [FR-PUB-06][fr], [EC-01][ec], and [EC-02][ec].
+24. **The order of the first checks** (section 4.4). Resolved (reconciled 2026-10-21): honeypot, rate limit, field validation, Turnstile, then `app.book_reservation`, as [api-specification][api] §2.3. Still **[P]**: every attempt counting toward the submission limit, and one generic bot-check message. Answers [booking-and-submission][wf-book] open question 5.
+25. **Duplicate-submission keys** (section 4.4). Resolved (reconciled 2026-10-21): the key in `localStorage`, the draft in `sessionStorage`, a fingerprint stored with the key's hash, and the same key with other data refused with `submission_key_mismatch`; this answers [booking-and-submission][wf-book] open question 3. The "browser session" wording of [FR-PUB-06][fr], [EC-01][ec], and [EC-02][ec] still needs the matching update.
 26. **[P] A hold-limit refusal never shows the existing reference code or QR** (section 4.4). Update [FR-PUB-06][fr] or [EC-09][ec].
 27. **[P] Turnstile response checks and the edge backstop** (section 4.4): hostname and action checked; Vercel Firewall's rule on the booking, status, and sign-in paths. Joins [architecture][arch] open question 12.
 28. **[P] Upload slots** (section 4.6): final slot states, the magic-byte check, only `uploaded` slots counting toward the upload limit, and a daily cleanup of stray files after one day. Answers [notifications-and-tracking][wf-notify] open question 14 (how the server learns the file arrived, and what counts) and open question 17. The cleanup needs a row in [privacy-and-retention][priv] §6.2.
-29. **[P] Proof view links last 5 minutes** (section 4.6). Answers [lookup-and-review][wf-review] open question 5 (second part).
+29. **Proof view links last 5 minutes** (section 4.6). Resolved (reconciled 2026-10-21): 5 minutes everywhere, [api-specification][api] §3.2 included; this answers [lookup-and-review][wf-review] open question 5 (second part).
 
 **Database, secrets, and operations**
 

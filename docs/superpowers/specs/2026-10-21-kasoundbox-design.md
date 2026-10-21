@@ -26,7 +26,7 @@ The release succeeds when all of the following hold:
 ## 2. Business context
 
 - **The business.** DJB Kasoundbox is a small videoke rental business in the Philippines. Currency is PHP (₱) and the time zone is Asia/Manila **[C]**.
-- **Registration.** The business is not registered as a business; it is small and serves only its local area **[C]**. See §14 for what this means for privacy law and receipts.
+- **Registration.** The business is not registered as a business; it is small and serves only its local area **[C]**. See §14 for what this means for privacy law, acknowledgments, and registration.
 - **Service types [C]:**
   - **Delivery:** staff bring, set up, and pick up the videoke at the customer's venue.
   - **On-site:** customers use the business's own room.
@@ -150,7 +150,8 @@ Rules:
 - **Deposit amount.** The deposit amount (a setting) is also copied in at submission.
 - **Deposit record.** Each record holds the amount, the method (cash or e-wallet), the e-wallet reference number, who received it, the time, and an optional note.
 - **Refunds.** When a Confirmed booking is cancelled, the refund decision is recorded: no refund, or a partial or full refund with the amount.
-- **Wording.** The system never calls a deposit record an "official receipt" or an "invoice". See §14.
+- **Wording.** Customers receive a **Deposit Acknowledgment** (`DA-YYYY-NNNN`), never an "Official Receipt" or "Invoice". It is issued as DJB Kasoundbox **[C]**. See §14.
+- **No payer details.** Payer names and account numbers are never copied from screenshots; only the e-wallet reference number is stored.
 
 ## 9. Notifications
 
@@ -186,6 +187,7 @@ Rules:
 | Framework | **Next.js 16.4.2**, App Router, TypeScript, pinned exactly; never below 16.4.1 (security fixes of 2026-10-14) |
 | Database | **Supabase Free** Postgres, region "Southeast Asia (Singapore)" |
 | DB connection | Supavisor transaction pooler (port 6543, IPv4), `pg` driver, pool of 1 per function |
+| UI | Tailwind CSS + shadcn/ui components **[C]**; forms with React Hook Form + the Zod resolver **[P]**. Versions are pinned at setup |
 | ORM / validation | Drizzle ORM 0.45.x + drizzle-kit; Zod 4 schemas shared by forms and server |
 | Admin auth | Better Auth 1.7.x: email + password, admin plugin (2 roles), required TOTP 2FA, argon2id hashing (`@node-rs/argon2`, fallback scrypt) |
 | Email | Resend Free (about 100/day and 3,000/month **[U]**) |
@@ -221,16 +223,17 @@ Rules:
 | `resources` | Each delivery set and the on-site room (kind, name, active) |
 | `packages`, `addons` | Catalog. Add-ons carry `daily_stock`. Items are archived, never deleted |
 | `delivery_slots` | Slot label, start and end time, active |
-| `settings` | Deposit amount, 72 h / 24 h deadlines, 1 h notice, 6 h reminder, on-site day hours, hold limits, business info |
-| `reservations` | Reference code; kind (booking or block); source; service type; date; slot; service start; status; deadline; needs-info and urgent flags; customer name, mobile, email, venue; package; price and deposit snapshot; QR token hash; version; timestamps |
+| `settings` | Deposit amount, 72 h / 24 h deadlines, 1 h notice, 6 h reminder, on-site day hours, hold limits, retention periods, acknowledgment issuer name, business info |
+| `reservations` | Reference code; kind (booking or block); source; service type; date; slot; service start; status; deadline; needs-info, urgent, and legal-hold flags; closure date; customer name, mobile, email, venue; package; price and deposit snapshot; QR token hash; version; timestamps |
 | `reservation_resources` | Which set or room is claimed on which date. A database rule allows only one live claim per resource per date |
 | `reservation_addons` | Add-on, date, quantity, unit-price snapshot |
-| `deposits` | Amount, method, reference number, received by, time |
-| `payment_proofs` | Storage path and upload time, at most 2 per reservation |
+| `deposits` | Acknowledgment number (`DA-YYYY-NNNN`), amount, method, e-wallet reference number, received by, verified time |
+| `payment_proofs` | Storage path, upload time, and deletion time; at most 2 per reservation; deleted 7 days after verification |
 | `reservation_notes` | Internal notes from admins |
-| `audit_log` | Append-only. Actor, action, reservation, before and after values, reason, time. This is also the reservation history |
+| `audit_log` | Append-only. Actor, action, reservation ID, changed fields, reason, time. This is also the reservation history. Entries never copy customer contact data (§14) |
+| `retention_runs` | Retention-job run log: date and counts per category, no personal data |
 | `notifications_outbox` | Queued emails with a unique key, attempts, next try, and sent time |
-| `rate_limits` | Counters keyed by hashed IP and hashed reference code plus mobile |
+| `rate_limits` | Counters keyed by an HMAC of the IP (key rotated daily) and of the reference code plus mobile; deleted after 24 h |
 | Better Auth tables | Admin users, sessions, 2FA secrets |
 
 **Identifiers [P]:**
@@ -282,29 +285,102 @@ sequenceDiagram
   - Images go to a private bucket: JPG, PNG, or WebP, at most 1 MB each and 2 per reservation.
   - The browser re-encodes each image, which strips GPS and other EXIF data.
   - Admins view proofs through short-lived links.
+  - Each image is deleted 7 days after the deposit is verified **[C]**.
 - **Secrets.** Secrets live only in Vercel's and GitHub's encrypted settings, and preview deployments never get production secrets. The database login role can only call the app's functions and read the tables it needs.
 - **Updates.** Versions are pinned. Critical security fixes are applied within 24–48 h, and Dependabot raises PRs for security advisories.
 
 ## 14. Privacy and data retention (Philippines)
 
-<!-- RETENTION-RESEARCH: filled in from the Philippine-law research round -->
+> **Caveat.** This section is research, not legal advice. Official legal sites were unreachable during research, so the wording comes from secondary copies and summaries. Everything marked **[U]**, and the retention periods themselves, must be confirmed by a Philippine lawyer before launch (O-8).
+
+**Does the Data Privacy Act (RA 10173) apply?** Yes, regardless of business registration.
+
+- **Who it covers.** Sec. 4 covers any natural or juridical person processing personal information. The personal/household exemption does not fit a rental business that charges fees.
+- **The owner's role.** The owner is the *personal information controller* and stays accountable for data held by Supabase, Vercel, Resend, Sentry, GitHub, and Cloudflare (Secs. 14, 20(d), 21).
+- **What kind of data this is.** Everything collected is personal information but **not** sensitive personal information, as long as the system never collects:
+  - IDs or ID numbers;
+  - birthdates or ages;
+  - religion or health data.
+
+  The notes fields warn customers not to enter these.
+
+**Obligations built into the design:**
+
+- **Privacy notice.** A short summary sits above the Submit button and links to the full notice. The full notice covers:
+  - who the controller is, and a privacy contact;
+  - what data is collected and why. The legal bases are the contract, legitimate interest (audit log, rate limits), and legal obligation (financial records);
+  - every recipient, and that data is stored in Singapore and processed abroad;
+  - the retention schedule below;
+  - data-subject rights, with requesters verified by reference code plus mobile number;
+  - the right to complain to the NPC;
+  - that deleted data may remain in encrypted backups for up to 30 days.
+- **Privacy officer.** The owner (or the other admin) is designated in writing as the DPO / compliance officer. The privacy contact email is published (O-9).
+- **NPC registration.** Mandatory registration is probably not required, since there is no sensitive personal information and far fewer than 250 employees. A free sworn exemption declaration (SDAU) may still have to be filed through the NPC's online registration system **[U]** (O-10).
+- **Erasure requests.** Delete everything that is not needed for tax records or a pending claim, and tell the customer what is kept and why.
+- **Legal hold.** A written complaint, demand, or case sets a `legal_hold` flag on the reservation. That pauses every deletion below until the matter is resolved.
+- **Breach procedure.** Payment data raises the chance that notification is required under NPC Circular 16-03 (72-hour rule **[U]**). The operations docs will include an incident runbook.
+
+**Retention schedule [C: defaults, stored as settings].**
+
+Two dates drive the schedule:
+
+- **Closure:** the latest of the event date and the final settlement of the deposit (refund or forfeiture).
+- **Ledger end:** 31 December of the 6th year after the closure year. For example, records closed in 2026 are processed in January 2033. This covers the 5-year tax-record period (NIRC Sec. 235 as amended by EOPT; RR 7-2024) and the 6-year oral-contract claim period (Civil Code Art. 1145).
+
+| Data | Kept for | Then |
+|---|---|---|
+| Customer name, mobile, email, free-text notes | Closure + 2 years | Delete (set to null; a hash does not count as anonymized) |
+| Exact delivery address | Closure + 2 years | Reduce to barangay / city; city only at ledger end |
+| Booking details and amounts, deposit records (acknowledgment no., amount, date, method, e-wallet reference no., receiving admin) | Until ledger end | Turn into anonymous statistics (month/year, package, amounts, city at most) |
+| Payment-proof images **[C]** | 7 days after the deposit is verified; never more than 30 days after closure | Hard-delete from Storage, and log the deletion |
+| Hashed IPs / rate-limit counters | 24 hours. HMAC with a key rotated daily, old keys destroyed | Delete |
+| Duplicate-submission keys | 72 hours | Delete |
+| Audit log, security events (logins, 2FA, permission changes) | 12 months, rolling | Delete |
+| Audit log, booking actions (IDs only, never customer contact data) | Until that booking's ledger end | Delete or reduce to counts |
+| Retention-job run logs (counts only) | Until ledger end | Delete |
+| Encrypted backups | 30 days at most, rolling; only the latest monthly offline copy is kept | Expire or destroy |
+| Admin account data | While the person is an admin. Disabled the same day they leave; credentials deleted within 30 days | Keep only an ID and display name inside retained audit entries |
+| Provider copies (Resend, Sentry, Vercel logs) | Shortest available setting (≤ 30 days); customer data scrubbed from Sentry | Provider expiry |
+
+A daily retention job applies the schedule and writes a run log that contains no personal data. Records under legal hold are skipped.
+
+**Deposit acknowledgments and the business name:**
+
+- **Titles.** Documents are titled **"Deposit Acknowledgment"** (numbered `DA-YYYY-NNNN`) and **"Booking Confirmation"**. Each carries the line *"This is an acknowledgment that a deposit was received. It is NOT an Official Receipt or Invoice."*
+- **Words that never appear:** "Official Receipt", "OR No.", "Invoice", a TIN, "BIR", or VAT wording.
+- **Issuer name [C: owner's choice].** Acknowledgments are issued as **DJB Kasoundbox**. The research found that Act 3883 requires DTI registration of a business name used on receipts and other written evidence of transactions. The owner accepts this risk and will raise it with a lawyer (O-11). The issuer name is a setting, so changing it to the owner's legal name is a configuration change.
+- **Payer details.** The system never copies payer names or account numbers from screenshots; it stores only the e-wallet reference number.
+
+**Unregistered business: facts to review with a CPA or lawyer (O-11).**
+
+- BIR registration has no size threshold. A sole proprietor registers before starting business (NIRC Sec. 236 as amended by EOPT; RMC 91-2024).
+- RA 12214 (effective 1 July 2025) sets penalties for doing business unregistered.
+- Other registrations: a DTI business name, a barangay clearance, and a mayor's permit.
+- The Internet Transactions Act (RA 11967) may require showing a registered business name and address on the website **[U]**.
+- The system keeps a complete transaction ledger, as if the business were registered, so the records support a later registration.
+
+**Key legal sources:**
+
+- **Privacy:** [RA 10173](https://privacy.gov.ph/wp-content/uploads/2017/03/DPA-of-2012.pdf) · [IRR](https://privacy.gov.ph/wp-content/uploads/2023/06/IRR_RA-10173-as-amended.pdf) · [NPC Circular 2022-04](https://privacy.gov.ph/wp-content/uploads/2023/05/Circular-2022-04-1.pdf) · [NPC Advisory 2017-01](https://privacy.gov.ph/wp-content/uploads/2022/01/NPC-Advisory-2017-01-sgd.pdf) · [NPC Circular 2023-06](https://privacy.gov.ph/wp-content/uploads/2024/03/NPC-Circular-Repeal-16-01-Signed.pdf) · [NPC Advisory 2026-02](https://privacy.gov.ph/wp-content/uploads/2026/05/Advisory-Clarification-on-the-Submission-of-Personal-Data-Breach-Notification-through-DBNMS_11-May-2026.pdf)
+- **Tax and business registration:** [RR 7-2024](https://bir-cdn.bir.gov.ph/BIR/pdf/RR%207-2024%20(final).pdf) · [RMC 91-2024](https://bir-cdn.bir.gov.ph/BIR/pdf/RMC%20No.%2091-2024%20Digest.pdf) · [RA 12214](https://www.lawphil.net/statutes/repacts/ra2025/ra_12214_2025.html) · [Act 3883](https://lawphil.net/statutes/acts/act1931/act_3883_1931.html)
+- **Contracts, consumers, and online transactions:** [Civil Code](https://lawphil.net/statutes/repacts/ra1949/ra_386_1949.html) · [Consumer Act](https://lawphil.net/statutes/repacts/ra1992/ra_7394_1992.html) · [RA 11967](https://www.lawphil.net/statutes/repacts/ra2023/ra_11967_2023.html) · [RA 8792](https://www.lawphil.net/statutes/repacts/ra2000/ra_8792_2000.html)
 
 ## 15. Scheduled jobs, backups, monitoring
 
 | When | Job | Runs on |
 |---|---|---|
 | Every minute | Expire overdue holds; send or retry queued emails; send deposit reminders 6 h before the deadline | Supabase Cron |
-| Daily | Mark the previous day's Confirmed bookings Completed; clean up old rate-limit and duplicate-key data; run the retention purge; send a keep-alive query so the free project is not paused | Supabase Cron |
+| Daily | Mark the previous day's Confirmed bookings Completed; rotate the IP-hash key; run the retention job (§14), which removes old rate-limit and duplicate-key data, proofs 7 days after verification, and expired customer fields; send a keep-alive query so the free project is not paused | Supabase Cron |
 | Daily | Backup sweep that catches anything the Supabase jobs missed | Vercel Cron |
 | Nightly | Encrypted database dump, kept for 14 days | GitHub Actions (private repo) |
-| Weekly | Encrypted export of payment-proof images | GitHub Actions |
-| Monthly | Owner downloads one encrypted copy to their own drive | Owner |
+| Weekly | Encrypted export of payment-proof images, kept for 7 days | GitHub Actions |
+| Monthly | Owner downloads one encrypted copy to their own drive and destroys the previous one (only the latest is kept, §14) | Owner |
 
 - **Restore test.** A restore from backup is tested before launch.
 - **Encryption.** Backups are encrypted with a public key; the private key is kept offline.
 - **Monitoring.**
   - Sentry tracks errors (personal data scrubbed), runs an uptime check on `/api/health`, and raises an alert if the job heartbeat stops.
-  - The admin **Health panel** shows the last expiry run, the email queue, and storage use. Proofs are kept with their records, and the free 1 GB holds about 3,000 proofs.
+  - The admin **Health panel** shows the last expiry run, the last retention run, the email queue, and storage use.
 
 ## 16. Error handling and edge cases
 
@@ -367,6 +443,8 @@ The spike ends with a go / no-go. Anything that fails is fixed before features a
 | Critical Next.js or React vulnerability | Pinned versions, Dependabot, patching within 24–48 h, risky features avoided |
 | Emails lost or duplicated | Queue in the database, unique keys, retries, status page as the source of truth |
 | Vendor terms not read in full (Vercel, Supabase, Resend, Sentry) **[U]** | Pre-launch terms check: save dated copies |
+| Unregistered business name on acknowledgments (Act 3883), and other registration duties | Owner accepts the risk; lawyer or CPA review (O-11); issuer name is a setting |
+| Privacy-law non-compliance | Privacy notice, DPO designation, retention job, legal hold, breach runbook; lawyer review before launch |
 
 ## 19. Open items
 
@@ -379,7 +457,10 @@ The spike ends with a go / no-go. Anything that fails is fixed before features a
 | O-5 | Domain name, Facebook Page, business email | Later |
 | O-6 | Make the GitHub repo private before backups are added **[C: owner will do it]** | Action |
 | O-7 | GitHub access for pushing from Claude sessions (the push currently returns 403) | Action |
-| O-8 | Pre-launch: read and save the vendor terms and DPAs; one-time review by a Philippine lawyer | Action |
+| O-8 | Pre-launch: read and save the vendor terms and DPAs; one-time review by a Philippine lawyer of §14, including the retention periods | Action |
+| O-9 | Designate the DPO / compliance officer in writing, and set up a privacy contact email | Action |
+| O-10 | Confirm whether the NPC sworn exemption declaration (SDAU) must be filed | Lawyer |
+| O-11 | Business registration (BIR, DTI name, barangay, mayor's permit) and use of "DJB Kasoundbox" on acknowledgments | CPA / lawyer |
 
 ## 20. Key sources
 

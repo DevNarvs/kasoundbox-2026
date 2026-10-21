@@ -46,6 +46,7 @@
 | D-21 | Privacy and legal | Proof images deleted 7 days after verification; researched retention periods as defaults; acknowledgments issued as "DJB Kasoundbox" | [C] |
 | D-22 | Repository | The GitHub repository is made private before backups are added | [C] |
 | D-23 | Documentation | Spec approved and frozen; these docs are the source of truth; English; written in reviewed batches | [C] |
+| D-24 | Voiding payments | Both admins can void a wrongly recorded deposit, balance, or refund record, with a reason | [C] |
 
 ---
 
@@ -468,6 +469,24 @@ The full retention schedule and the wording rules for acknowledgments are define
 **Rationale.** Each rule has one home, so the docs cannot contradict each other. Small batches are easier to review.
 
 **Docs affected:** every doc in `docs/`, and the [docs index](../README.md)
+
+---
+
+### D-24 · Both admins can void any wrongly recorded payment
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** batch 1 review (the developer's answer)
+
+**Decision.**
+- Either admin can void a wrongly recorded deposit, balance, or refund record. A reason is required.
+- The record stays, marked void with the reason, the admin, and the time.
+- Its acknowledgment number is retired and never reused.
+- A voided payment no longer counts toward the deposit or the balance due.
+
+**Options considered.** Both admins, or the Super Admin only.
+
+**Rationale.** It follows the existing rule for deposits, and both admins already record every kind of payment.
+
+**Docs affected:** [roles-and-permissions](../01-requirements/roles-and-permissions.md) (§2.2) · [catalog-and-payments](../02-domain/catalog-and-payments.md) (voiding, balance due) · [functional-requirements](../01-requirements/functional-requirements.md) (FR-ADM-15)
 
 ---
 

@@ -75,7 +75,7 @@ Every requirement in this document is part of the MVP (the first release). Items
 | FR-ADM-12 | Verify or reject an uploaded proof | Yes | [C]; late rejection [P] |
 | FR-ADM-13 | Same-day deposit waiver | Yes | [C] |
 | FR-ADM-14 | Record a balance payment | Yes | [C] |
-| FR-ADM-15 | Void a payment | Yes | MVP scope; balance and refund voids [P] (new in this doc) |
+| FR-ADM-15 | Void a payment | Yes | MVP scope; balance and refund voids [C] (D-24) |
 | FR-ADM-16 | Extend a deadline | Yes | [C] |
 | FR-ADM-17 | Reschedule | Yes | [C]; details [P] |
 | FR-ADM-18 | Cancel with a refund decision | Yes | [C] |
@@ -573,7 +573,7 @@ These checks apply to every reservation action in FR-ADM-08 to FR-ADM-24. The ro
 
 ### FR-ADM-15 · Void a payment
 
-**MVP:** Yes · **Label:** MVP scope (voiding a deposit, spec v0.2 §4); voiding a balance or refund record **[P] (new in this doc)** · **Relies on:** [catalog-and-payments](../02-domain/catalog-and-payments.md) (voiding); [roles-and-permissions](roles-and-permissions.md) section 2.2
+**MVP:** Yes · **Label:** MVP scope (voiding a deposit, spec v0.2 §4); voiding a balance or refund record **[C]** (D-24) · **Relies on:** [catalog-and-payments](../02-domain/catalog-and-payments.md) (voiding); [roles-and-permissions](roles-and-permissions.md) section 2.2
 
 **Acceptance criteria**
 - An admin can void a wrongly recorded deposit, balance, or refund record. A reason is required.

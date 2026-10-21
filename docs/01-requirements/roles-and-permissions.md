@@ -61,14 +61,13 @@ This is the full matrix. It extends the confirmed role split in D-07 and D-17 wi
 |---|---|---|---|---|
 | Record a deposit | ✓ | ✓ | [C] D-05, D-07 | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 | Void a wrongly recorded deposit (reason required) | ✓ | ✓ | No label | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
-| Void a wrongly recorded balance or refund record (reason required) ¹ | ✓ | ✓ | [P] (new in this doc) | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
+| Void a wrongly recorded balance or refund record (reason required) | ✓ | ✓ | [C] ([D-24](../00-project/decision-log.md)) | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 | Verify or reject a deposit proof the customer uploaded (rejection needs a reason) | ✓ | ✓ | [C] D-05 | [business-rules](business-rules.md) (BR-12) |
 | Record a balance payment | ✓ | ✓ | [C] D-05 | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 | Record a refund paid | ✓ | ✓ | [C] D-05, D-07 | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 | Waive the deposit for a same-day booking (reason required) | ✓ | ✓ | [C] D-06 | [reservation-lifecycle](../02-domain/reservation-lifecycle.md) (same-day deposit waiver) |
 | Open and print payment acknowledgments and booking confirmations at the office | ✓ | ✓ | [P] | [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 
-¹ The spec's matrix (spec v0.2 §4) names only "void a deposit". This row is inferred from the payments ledger and the edge cases (spec v0.2 §8 and §16), which apply voiding to any wrongly recorded payment, and from both admins being allowed to record every kind of payment. It is **[P] (new in this doc)**: not yet approved, so please confirm or correct it in this review. If it needs a wider discussion, raise it as open item O-12 in the [decision log](../00-project/decision-log.md).
 
 *Example.* Ben paid a ₱1,000 deposit for Sunday 27 December 2026. On 22 December he calls to cancel. Either admin cancels the booking, gives the reason, and records the refund decision, for example "partial, ₱500" (section 2.3). On 23 December, Ben collects the ₱500 at the office, and either admin records the refund paid.
 

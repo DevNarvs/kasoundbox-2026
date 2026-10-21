@@ -123,7 +123,7 @@ The server calculates the price from the catalog:
 
 - **Nothing else is added in the MVP.** There is no delivery fee (section 1.5). A promotions manager is on the "Later" list ([project-charter](../00-project/project-charter.md)).
 - **Deposit.** The fixed deposit amount from the settings **[C]** (D-05). It is one fixed amount, not a share of the total. The amount is still open (O-03).
-- **Balance due.** The total minus the deposit and balance payments recorded so far. Voided payments do not count **[P] (new in this doc)**.
+- **Balance due.** The total minus the deposit and balance payments recorded so far. Voided payments do not count **[C]** (D-24).
 
 Where the amounts appear: the review step of the form shows the breakdown, the total, and the deposit ([FR-PUB-06](../01-requirements/functional-requirements.md)). The status page shows the total, the deposit, and the balance due ([FR-PUB-11](../01-requirements/functional-requirements.md)). Each acknowledgment shows the balance due after that payment (section 5.3).
 
@@ -262,7 +262,7 @@ A refund has two separate steps.
 
 ### 4.6 Voiding a payment
 
-- **A wrongly recorded payment is voided, with a reason.** Deposits can be voided (spec v0.2 §4). Voiding a balance or a refund record is **[P] (new in this doc)**, inferred from spec v0.2 §8 and §16 ([roles-and-permissions](../01-requirements/roles-and-permissions.md) §2.2).
+- **A wrongly recorded payment is voided, with a reason.** Deposits can be voided (spec v0.2 §4). Either admin can also void a balance or a refund record **[C]** ([D-24](../00-project/decision-log.md)).
 - **The record stays.** It is marked void, with the reason, the admin, and the time. A voided payment no longer counts: it is not the active deposit, and it is left out of the balance due.
 - **Its acknowledgment number is retired.** The number is never reused, and the counter does not go back.
 - **A void changes no status.** The lifecycle has no transition for it ([reservation-lifecycle](reservation-lifecycle.md)). Whether the correct deposit can then be recorded on a Confirmed booking is an open question ([functional-requirements](../01-requirements/functional-requirements.md) §7, question 3).

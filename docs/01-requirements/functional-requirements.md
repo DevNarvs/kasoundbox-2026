@@ -836,7 +836,7 @@ Spec v0.2 labels the customer emails **[C]**, and the extra types **[P]**. In th
 | FR-NTF-04 | Deposit reminder | 6 hours before the deposit deadline (the lead time is a setting) | *The deadline and the deposit instructions* | [C] (D-10) |
 | FR-NTF-05 | Deadline extended | An admin extends the deadline (FR-ADM-16) | The new deadline | [P] |
 | FR-NTF-06 | Proof not accepted | An admin rejects an uploaded proof (FR-ADM-12) | The reason | [P] |
-| FR-NTF-07 | Confirmed | The booking becomes Confirmed: deposit recorded (FR-ADM-11) or deposit waived (FR-ADM-13) | Links to the acknowledgment *(when a payment was recorded)* and the booking confirmation | [C] |
+| FR-NTF-07 | Confirmed | The booking becomes Confirmed: deposit recorded (FR-ADM-11) or deposit waived (FR-ADM-13) | Points the customer to the status page, where the acknowledgment *(when a payment was recorded)* and the booking confirmation open after a status lookup (FR-PUB-14) | [C]; link behavior [P] (reconciled 2026-10-21) |
 | FR-NTF-08 | Reservation updated | An admin edits the details (FR-ADM-10) | *The updated booking details* | [P] |
 | FR-NTF-09 | Rejected | An admin rejects the request (FR-ADM-08) | The reason | [C] |
 | FR-NTF-10 | Cancelled | An admin cancels the booking (FR-ADM-18) | *The reason and* the refund decision | [C] |

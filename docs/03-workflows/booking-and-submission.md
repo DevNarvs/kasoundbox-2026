@@ -4,8 +4,8 @@
 > **Audience:** The developer (Super Admin) and the business owner (Admin). Every workflow starts with "In plain words" for the business owner; the "Developer notes" subsections are mainly for the developer ·
 > **Status:** Draft for review ·
 > **Last updated:** 2026-10-21 ·
-> **Depends on:** [Glossary][gl], [Decision log][dl], [Project charter][charter], [Roles and permissions][roles], [Business rules][br], [Functional requirements][fr], [Non-functional requirements][nfr], [Edge cases][ec], [Privacy and retention][priv], [Reservation lifecycle][lc], [Catalog and payments][cat]; sibling workflows [availability-and-conflicts](availability-and-conflicts.md) (WF-05), [lookup-and-review](lookup-and-review.md) (WF-03, WF-04), [changes-and-expiry](changes-and-expiry.md) (WF-06), [notifications-and-tracking](notifications-and-tracking.md) (WF-07) ·
-> **Derived from:** [functional-requirements][fr] FR-PUB-01 to FR-PUB-09, FR-NTF-01, FR-NTF-13, FR-NTF-15 to FR-NTF-21, FR-SYS-03; [business-rules][br] BR-01 to BR-11; [reservation-lifecycle][lc] §3 and §4.2 row 1; [catalog-and-payments][cat] §1 and §2; [non-functional-requirements][nfr] NFR-03, NFR-11 to NFR-13, NFR-17 to NFR-21; [edge-cases][ec] EC-01 to EC-17, EC-22, EC-60 to EC-62, EC-66 to EC-68; [privacy-and-retention][priv] §3, §5.1, §6.2; background: [spec v0.2][spec] §5, §6, §9, §10, §11, §12, §13, §16 (frozen, never edited)
+> **Depends on:** [Glossary][gl], [Decision log][dl], [Project charter][charter], [Roles and permissions][roles], [Business rules][br], [Functional requirements][fr], [Non-functional requirements][nfr], [Edge cases][ec], [Privacy and retention][priv], [Reservation lifecycle][lc], [Catalog and payments][cat]; sibling workflows [availability-and-conflicts](availability-and-conflicts.md) (WF-05), [lookup-and-review](lookup-and-review.md) (WF-03, WF-04), [changes-and-expiry](changes-and-expiry.md) (WF-06), [notifications-and-tracking](notifications-and-tracking.md) (WF-07), [administration](administration.md) (WF-08 to WF-10) ·
+> **Derived from:** [functional-requirements][fr] FR-PUB-01 to FR-PUB-09, FR-NTF-01, FR-NTF-13, FR-NTF-15 to FR-NTF-21, FR-SYS-03; [business-rules][br] BR-01 to BR-11; [reservation-lifecycle][lc] §3, §4.1, and §4.2 rows 1, 9, and 10; [catalog-and-payments][cat] §1 and §2; [non-functional-requirements][nfr] NFR-03, NFR-11 to NFR-13, NFR-17 to NFR-21; [edge-cases][ec] EC-01 to EC-17, EC-22, EC-60 to EC-62, EC-66 to EC-68; [privacy-and-retention][priv] §3, §5.1, §6.2; background: [spec v0.2][spec] §5, §6, §9, §10, §11, §12, §13, §16 (frozen, never edited)
 
 ## How to read this document
 
@@ -25,7 +25,10 @@
 | Opening a reservation by QR scan or search; the admin's review and decision | WF-03, WF-04 | [lookup-and-review](lookup-and-review.md) |
 | Cancel, reschedule, expiry, and recreating an expired request | WF-06 | [changes-and-expiry](changes-and-expiry.md) |
 | Emails in general, the status page, and tracking a request | WF-07 | [notifications-and-tracking](notifications-and-tracking.md) |
-| Reissuing a QR code | WF-03, WF-06 | [lookup-and-review](lookup-and-review.md), [changes-and-expiry](changes-and-expiry.md) |
+| Admin reissue of a QR code ([FR-ADM-22][fr]) | WF-03D | [lookup-and-review](lookup-and-review.md) |
+| Customer reissue of a QR code on the status page ([FR-PUB-13][fr]) | WF-07D steps 9 to 11 | [notifications-and-tracking](notifications-and-tracking.md) |
+| A staff-created booking (phone, walk-in, Facebook) | WF-04G | [lookup-and-review](lookup-and-review.md) |
+| Ending a breaker pause early | WF-08G | [administration](administration.md) |
 
 ---
 
@@ -66,7 +69,7 @@ flowchart TD
     W9 -->|"Pick another date"| W2
     W9 -->|"Fix a field"| W3
     W9 -->|"Paused or too soon"| W10["Customer messages or calls<br/>the business"]
-    W10 --> W11["An admin may create the booking<br/>as a staff-created booking"]
+    W10 --> W11["An admin may create the booking<br/>as a staff-created booking: WF-04G"]
     classDef customer fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
     classDef system fill:#f5f5f5,stroke:#616161,color:#212121
     classDef admin fill:#fff3e0,stroke:#ef6c00,color:#e65100
@@ -118,12 +121,14 @@ The customer looks at the packages and add-ons with their prices, then picks del
 flowchart TD
     A1["Customer opens the home page"] --> A2["Views packages and add-ons<br/>with prices"]
     A2 --> A3["Picks a service type<br/>delivery or on-site"]
-    A3 --> D1{"Online booking paused<br/>by the breaker?"}
-    D1 -->|"Yes"| X1["Banner: please message<br/>or call us"]
-    D1 -->|"No"| A4["Calendar shows each date<br/>Available or Full"]
+    A3 --> A4["Calendar for that service type<br/>live, never cached"]
     A4 --> D2{"Date inside the<br/>booking window?"}
     D2 -->|"No"| X2["Date cannot be picked"]
-    D2 -->|"Yes"| D3{"Date shows Available?"}
+    D2 -->|"Yes"| D1{"Online booking paused<br/>by the breaker?"}
+    D1 -->|"Yes"| X1["Banner: please message or call us<br/>no online request accepted"]
+    X1 --> N1["Labels under the banner:<br/>availability open question 4"]
+    X1 --> A10["Customer messages or calls<br/>an admin may book: WF-04G"]
+    D1 -->|"No"| D3{"Date shows Available?"}
     D3 -->|"No, Full"| X3["Pick another date"]
     X3 --> A4
     D3 -->|"Yes"| A5["Form opens with service type<br/>and date filled in"]
@@ -143,10 +148,12 @@ flowchart TD
     classDef admin fill:#fff3e0,stroke:#ef6c00,color:#e65100
     classDef status fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
-    class A1,A2,A3,A6,A7,A8,A9 customer
-    class D1,A4,D2,D3,A5,D4,D5,D6 system
+    class A1,A2,A3,A6,A7,A8,A9,A10 customer
+    class D1,A4,D2,D3,A5,D4,D5,D6,N1 system
     class X1,X2,X3,X4,X5 failure
 ```
+
+The order of the first two checks (booking window, then the pause) follows the flowchart in [BR-09][br], as in [WF-05A](availability-and-conflicts.md).
 
 ### Sequence diagram
 
@@ -161,14 +168,14 @@ sequenceDiagram
     N->>DB: Read availability for the booking window
     Note over DB: Live claims and active blocks count.<br/>Overdue holds do not, unless expiry is paused.<br/>Today needs a start time that meets the notice period.
     DB-->>N: Available or Full for each date, and the paused flag
-    alt online booking paused
+    opt online booking paused
         N-->>C: Banner asking to message or call the business
-    else online booking open
-        N-->>C: Calendar with Available or Full
-        C->>N: Pick an Available date
-        N-->>C: Form with service type and date filled in
-        C->>C: Pick package, add-ons, and slot or arrival time
+        Note over C,N: No online request is accepted.<br/>Labels under the banner: availability open question 4
     end
+    N-->>C: Calendar page, never cached
+    C->>N: Pick an Available date, while online booking is open
+    N-->>C: Form with service type and date filled in
+    C->>C: Pick package, add-ons, and slot or arrival time
 ```
 
 ### Steps
@@ -178,22 +185,22 @@ sequenceDiagram
 | 1 | Customer | Opens the home page. It names both services **[C]** and links to the packages page, the calendar, the form, the status page, the privacy notice, and contact and FAQ (the links are **[P]**, new in [FR-PUB-01][fr]). | Nothing personal | [FR-PUB-01][fr], [D-01][dl] |
 | 2 | Customer, Website | Opens the packages and add-ons page: each active package with its inclusions and price, each active add-on with its price. Archived items are not shown. The free-delivery wording is shown (O-04; on this page **[P]**, new in [FR-PUB-02][fr]). | Read: packages, add-ons (cached) | [FR-PUB-02][fr], [catalog-and-payments][cat] §1.1, §1.2, §1.5, [D-14][dl], [NFR-03][nfr] |
 | 3 | Customer | Picks a service type: delivery or on-site. | — | [FR-PUB-03][fr], [D-01][dl] |
-| 4 | Website | If the breaker has paused online booking, shows "please message or call us" instead of accepting requests. | Read: the online-booking pause setting | [BR-07a][br], [FR-PUB-03][fr], [FR-PUB-06][fr] |
-| 5 | Website, Database | Shows the calendar for that service type: **Available** or **Full** for each date from today through the booking window (180 days by default, BR-09). Always live; no names or counts. | Read: active sets and the room, live claims, active blocks, hold deadlines, settings | [BR-09][br], [BR-01 to BR-05][br], [BR-08][br], [FR-PUB-03][fr]; how it is worked out: [WF-05](availability-and-conflicts.md) |
+| 4 | Website, Database | Shows the calendar for that service type: **Available** or **Full** for each date from today through the booking window (180 days by default, BR-09). Dates outside the window cannot be picked. Always live; no names or counts. | Read: active sets and the room, live claims, active blocks, hold deadlines, settings | [BR-09][br], [BR-01 to BR-05][br], [BR-08][br], [FR-PUB-03][fr]; how it is worked out: [WF-05A](availability-and-conflicts.md) |
+| 5 | Website | If the breaker has paused online booking, shows the banner "please message or call us", and no online request is accepted. Whether the Available and Full labels still show under the banner is [availability-and-conflicts](availability-and-conflicts.md) open question 4. | Read: the online-booking pause setting | [BR-07a][br], [BR-09][br], [FR-PUB-03][fr], [FR-PUB-06][fr] |
 | 6 | Customer | Picks an Available date. The form opens with the service type and date filled in (**[P]**, new in [FR-PUB-03][fr]). A Full date does not continue; dates outside the booking window cannot be picked. | — | [FR-PUB-03][fr], [EC-07][ec], [EC-08][ec] |
 | 7 | Customer | Picks one package. | Read: packages | [FR-PUB-04][fr], [catalog-and-payments][cat] §1.1 |
-| 8 | Customer | Adds add-ons, with a quantity for each (optional). The calendar does not look at add-on stock; the stock is checked at Submit (WF-01C step 13). | Read: add-ons | [FR-PUB-04][fr], [BR-03][br], [BR-09][br], [EC-05][ec] |
+| 8 | Customer | Adds add-ons, with a quantity for each (optional). The calendar does not look at add-on stock; the stock is checked at Submit (WF-01C step 14). | Read: add-ons | [FR-PUB-04][fr], [BR-03][br], [BR-09][br], [EC-05][ec] |
 | 9a | Customer | **Delivery:** picks one active delivery slot and sees the free-delivery wording (on the form **[P]**, new in [FR-PUB-04][fr]). The slot sets the event time; the set is held all day **[C]**. | Read: delivery slots | [FR-PUB-04][fr], [D-03][dl], [catalog-and-payments][cat] §1.3, O-02, O-04 |
 | 9b | Customer | **On-site:** picks an arrival time. A time outside on-site hours is refused **[C]**. | Read: on-site hours setting | [FR-PUB-04][fr], [D-03][dl], O-02 |
-| 10 | Website | **Same day:** a start less than the notice period away (1 hour by default, BR-06) is refused. The time that counts is the moment of Submit, so the database checks it again in WF-01C step 9. | Read: notice period setting | [BR-06][br], [FR-PUB-04][fr], [EC-06][ec] |
+| 10 | Website | **Same day:** a start less than the notice period away (1 hour by default, BR-06) is refused. The time that counts is the moment of Submit, so the database checks it again in WF-01C step 10. | Read: notice period setting | [BR-06][br], [FR-PUB-04][fr], [EC-06][ec] |
 | 11 | Customer | Continues to WF-01B. The draft is kept in the browser session. | Browser session: the draft | [FR-PUB-06][fr], [EC-02][ec] |
 
 ### Decision points and validation
 
 | Decision | If yes | If no | Rule |
 |---|---|---|---|
-| Is online booking paused by the breaker? | Banner: please message or call us; no request is accepted | The calendar is shown | [BR-07a][br], [FR-PUB-03][fr] |
 | Is the date inside the booking window? | It can be picked | It cannot be picked | [BR-09][br] |
+| Is online booking paused by the breaker? | Banner: please message or call us; no request is accepted. Labels under the banner: [availability-and-conflicts](availability-and-conflicts.md) open question 4 | The calendar works as normal | [BR-07a][br], [BR-09][br], [FR-PUB-03][fr] |
 | Does the date show Available? | The form opens | Pick another date | [BR-09][br], [FR-PUB-03][fr] |
 | Delivery or on-site? | Delivery: pick a slot | On-site: pick an arrival time | [FR-PUB-04][fr], [D-03][dl] |
 | Is the arrival time inside on-site hours? | Accepted | Refused | [FR-PUB-04][fr] |
@@ -207,7 +214,7 @@ sequenceDiagram
 | Online booking is paused by the breaker | "Please message or call us". Admins can still create phone, walk-in, and Facebook bookings ([BR-06a][br]). | [EC-15][ec] |
 | The date is beyond the booking window | The date cannot be picked. | [EC-08][ec] |
 | Today shows Full although a set or the room is free, because no start time left meets the notice period | Full for today. | [EC-07][ec] |
-| The chosen start is too soon | Refused with a clear message. The customer can message or call, and an admin can create the booking. | [EC-06][ec], [EC-41][ec] |
+| The chosen start is too soon | Refused with a clear message. The customer can message or call, and an admin can create the booking ([WF-04G](lookup-and-review.md)). | [EC-06][ec], [EC-41][ec] |
 | A hold on that date has passed its deadline, but the every-minute job has not run yet | The date already shows Available. | [EC-22][ec] |
 | The calendar showed Available, but the add-on stock is short, or someone takes the last set while the customer is choosing | Found at Submit (WF-01C). | [EC-03][ec], [EC-05][ec] |
 
@@ -218,7 +225,7 @@ None. This sub-flow only reads. The calendar treats an overdue hold as already e
 ### Developer notes
 
 - **Pages.** The packages page is cached and refreshed when the catalog is edited; the calendar and the form's availability are live, never cached; no polling ([NFR-03][nfr], [FR-PUB-02][fr], [FR-PUB-03][fr]).
-- **Database function:** an availability read, for example `app.get_availability(service_type, from_date, to_date)`. It must treat "deadline passed and `expiry_paused` false" as free ([BR-05][br]) and use the Manila date for "today" ([NFR-19][nfr]).
+- **Database function:** an availability read, `app.availability_calendar(service_type, from_date, to_date)` (the same name as in [WF-05A](availability-and-conflicts.md), which owns the calendar). It must treat "deadline passed and `expiry_paused` false" as free ([BR-05][br]) and use the Manila date for "today" ([NFR-19][nfr]).
 - **Routes:** public pages such as `/packages`, `/availability`, and `/book`.
 - **Audit category / outbox email type:** none; this sub-flow writes nothing.
 - **Shared schema.** The form uses the Zod schemas shared with the server ([FR-PUB-06][fr] developer note).
@@ -338,9 +345,9 @@ None. Nothing is saved in the database until WF-01C.
 
 ### In plain words
 
-When the customer presses Submit, the website first checks that a person, not a bot, sent the form, and that every field is valid. Then the database checks everything again in one step, at the exact moment of Submit: the notice period, the limits on open requests per mobile number, whether online booking is paused, a free set or the room, and enough add-on stock. If all is well, the request is saved as **Pending Confirmation**, the prices are locked, and the customer sees the confirmation page (WF-02); both admins get an email. If not, the customer sees a clear reason, and the form keeps everything they typed. Pressing Submit twice, or again after a network error, never makes a second request.
+When the customer presses Submit, the website first checks that a person, not a bot, sent the form, and that every field is valid. Then the database checks everything again in one step, at the exact moment of Submit: the booking window, the notice period, the limits on open requests per mobile number, whether online booking is paused, a free set or the room, and enough add-on stock. If all is well, the request is saved as **Pending Confirmation**, the prices are locked, and the customer sees the confirmation page (WF-02); both admins get an email. If not, the customer sees a clear reason, and the form keeps everything they typed. Pressing Submit twice, or again after a network error, never makes a second request.
 
-*Example.* Only one delivery set is still free on Thursday 24 December 2026. Carla and Dan press Submit at the same instant. Carla gets the set. Dan sees "just taken, pick another date", and his form keeps his details ([EC-04][ec]).
+*Example.* Only one delivery set is still free on Thursday 24 December 2026. Carla and Dan press Submit at the same instant. Carla gets the set. Dan sees "just taken, pick another date", and his form keeps his details ([EC-04][ec]; step by step in [WF-05C](availability-and-conflicts.md)).
 
 ### Actors and responsibilities
 
@@ -379,7 +386,9 @@ flowchart TD
     D4 -->|"Yes"| R1["Return the same reservation<br/>and reference code"]
     D4 -->|"No"| S4["Expire overdue holds"]
     S4 --> ST0["Overdue holds, if any: Expired"]
-    ST0 --> D5{"Start at least the notice<br/>period after Submit?"}
+    ST0 --> D10{"Date inside the<br/>booking window?"}
+    D10 -->|"No"| X10["Refused: date outside<br/>the booking window"]
+    D10 -->|"Yes"| D5{"Start at least the notice<br/>period after Submit?"}
     D5 -->|"No"| X4["Refused: too soon<br/>message or call us"]
     D5 -->|"Yes"| D6{"Hold limits OK<br/>for this mobile number?"}
     D6 -->|"No"| X5["Refused: open-request<br/>limit reached"]
@@ -403,13 +412,13 @@ flowchart TD
     classDef status fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
     class S1,S2 customer
-    class D1,D2,D3,S3,D4,R1,S4,D5,D6,D7,D8,D9,S5,S6,S7,S8 system
+    class D1,D2,D3,S3,D4,R1,S4,D10,D5,D6,D7,D8,D9,S5,S6,S7,S8 system
     class ST0,ST1 status
     class A1 admin
-    class X1,X2,X3,X4,X5,X6,X7,X8,X9 failure
+    class X1,X2,X3,X4,X5,X6,X7,X8,X9,X10 failure
 ```
 
-The order of the checks inside the database follows [BR-09][br] (developer note): lock, overdue holds, notice, hold limits and breaker, set or room, then add-on stock. The order of the first server checks (rate limit, bot check, fields, duplicate key) is not fixed by batch-1 docs; see open question 5.
+The order of the checks inside the database follows [BR-09][br] (developer note): lock, overdue holds, notice, hold limits and breaker, set or room, then add-on stock. That note does not place the booking-window check, which [reservation-lifecycle][lc] §4.2 row 1 makes a precondition of a submission; its place here, just before the notice check, is indicative. The order of the first server checks (rate limit, bot check, fields, duplicate key) is not fixed by batch-1 docs; see open question 5.
 
 ### Sequence diagram: submission end to end
 
@@ -432,7 +441,7 @@ sequenceDiagram
         N-->>C: Clear message, the form keeps the data
     else server checks passed
         N->>DB: One call to app.book_reservation
-        Note over DB: Capacity lock, duplicate key, expire overdue holds,<br/>notice, hold limits, breaker,<br/>claim a set or the room, add-on stock
+        Note over DB: Capacity lock, duplicate key, expire overdue holds,<br/>booking window, notice, hold limits, breaker,<br/>claim a set or the room, add-on stock
         alt key already used
             DB-->>N: The same reservation and reference code
             N-->>C: Confirmation again, nothing new created
@@ -441,7 +450,7 @@ sequenceDiagram
             DB-->>N: Refused, paused for 60 minutes
             N-->>C: Please message or call us
         else other refusal
-            DB-->>N: Refused with a reason such as too soon, limit, paused, just taken, stock
+            DB-->>N: Refused with a reason such as outside the window, too soon, limit, paused, just taken, stock
             N-->>C: Clear message, the form keeps the data
         else booked
             DB->>O: Request-received and new-request emails, same transaction
@@ -469,17 +478,18 @@ sequenceDiagram
 | 5 | Next.js server | Makes **one** call to the booking function. The rest of the submission happens inside it, all or nothing. | — | [FR-PUB-06][fr], [NFR-21][nfr] |
 | 6 | Database | Takes the single capacity lock. | Lock row | [NFR-20][nfr], [BR-09][br] developer note |
 | 7 | Database | **Duplicate submission.** If this key already belongs to a reservation, returns that reservation and its reference code. Nothing new is created. | Read: duplicate-submission keys (hashed) | [FR-PUB-06][fr], [EC-01][ec] |
-| 8 | Database | Expires overdue holds, the same tidy-up the every-minute job does. | Update: overdue holds → Expired | [BR-05][br], [BR-09][br] developer note, [FR-SYS-01][fr] |
-| 9 | Database | **Notice.** The service start must be at least the notice period after the moment of Submit. | Read: notice period setting | [BR-06][br], [EC-06][ec] |
-| 10 | Database | **Hold limits.** Counts this mobile number's open online requests (1 per date and 2 in total, BR-07). | Read: open online reservations for the standard-form mobile | [BR-07][br], [BR-11][br], [EC-09][ec], [EC-10][ec] |
-| 11 | Database | **Breaker.** If online booking is paused, refuses. If this request would be the 7th online request within 60 minutes (BR-07a), refuses it, pauses online booking, and queues one email to both admins. | Read: online requests of the last 60 minutes, the pause setting. On a trip: update the pause setting; queue the paused email; audit entry, actor "system" | [BR-07a][br], [FR-NTF-15][fr], [roles][roles] §4, [EC-15][ec] |
-| 12 | Database | **Capacity.** Claims a free delivery set (delivery) or the room (on-site) for the event date. The customer never picks the set. | Create: set or room claim | [BR-01][br], [BR-02][br], [BR-04][br], [BR-08][br], [EC-03][ec], [EC-04][ec], [EC-17][ec] |
-| 13 | Database | **Add-on stock.** Checks the stock for that date and claims the quantities. | Create: add-on claims, with unit-price snapshot | [BR-03][br], [EC-05][ec] |
-| 14 | Database | **Saves the reservation:** status Pending Confirmation, source `online`, service start, deadline (submission + 72 hours, capped at the service start), urgent if the event date is today, the price and deposit snapshot, the customer details, and the reference code and QR hash from WF-02. | Create: reservation | [reservation-lifecycle][lc] §3.1, §3.2, §4.2 row 1; [catalog-and-payments][cat] §2.2; [D-12][dl]; [BR-06a][br] |
-| 15 | Database | In the same step: writes the audit entry (actor "customer"); queues the request-received email (only if an email was given) and the new-online-request email to both admins (urgent ones marked); saves the key against the reservation. | Create: audit entry, outbox rows, duplicate-submission key | [FR-PUB-06][fr], [FR-ADM-32][fr], [FR-NTF-01][fr], [FR-NTF-13][fr], [FR-NTF-16][fr] |
-| 16 | Next.js server | Shows the confirmation page (WF-02). | — | [FR-PUB-07][fr] |
-| 17 | Next.js server, Resend | Right after the reply, tries to send the queued emails. The every-minute job sends anything still waiting, with retries and caps. | Update: outbox status | [FR-NTF-16 to FR-NTF-20][fr], [FR-SYS-03][fr] |
-| 18 | Admins | See the new request on the dashboard, urgent ones marked, and in their email. They review it in [WF-04](lookup-and-review.md). | Read | [FR-ADM-02][fr], [FR-NTF-13][fr], [BR-06a][br] |
+| 8 | Database | Marks overdue holds Expired before claiming. Each one is the normal "deadline passed" change of lifecycle rows 9 and 10, so it writes its audit entry and queues the expired email, as every status change does. Which overdue holds (every one, or only those on the requested date): open question 8. | Update: overdue holds → Expired; create: their audit entries and outbox rows | [BR-05][br], [BR-09][br] developer note, [FR-PUB-06][fr] developer note, [reservation-lifecycle][lc] §4.1 and §4.2 rows 9 and 10, [FR-NTF-12][fr] |
+| 9 | Database | **Booking window.** The event date must be within the booking window. The form checked it first (step 4); the database checks it again at the moment of Submit. | Read: booking window setting | [BR-09][br], [reservation-lifecycle][lc] §4.2 row 1, [EC-08][ec] |
+| 10 | Database | **Notice.** The service start must be at least the notice period after the moment of Submit. | Read: notice period setting | [BR-06][br], [EC-06][ec] |
+| 11 | Database | **Hold limits.** Counts this mobile number's open online requests (1 per date and 2 in total, BR-07). | Read: open online reservations for the standard-form mobile | [BR-07][br], [BR-11][br], [EC-09][ec], [EC-10][ec] |
+| 12 | Database | **Breaker.** If online booking is paused, refuses. If this request would be the 7th online request within 60 minutes (BR-07a), refuses it, pauses online booking, and queues one email to both admins. Either admin can end the pause early ([WF-08G](administration.md)). | Read: online requests of the last 60 minutes, the pause setting. On a trip: update the pause setting; queue the paused email; audit entry, actor "system" | [BR-07a][br], [FR-NTF-15][fr], [roles][roles] §4, [EC-15][ec] |
+| 13 | Database | **Capacity.** Claims a free delivery set (delivery) or the room (on-site) for the event date. The customer never picks the set. | Create: set or room claim | [BR-01][br], [BR-02][br], [BR-04][br], [BR-08][br], [EC-03][ec], [EC-04][ec], [EC-17][ec] |
+| 14 | Database | **Add-on stock.** Checks the stock for that date and claims the quantities. | Create: add-on claims, with unit-price snapshot | [BR-03][br], [EC-05][ec] |
+| 15 | Database | **Saves the reservation:** status Pending Confirmation, source `online`, service start, deadline (submission + 72 hours, capped at the service start), urgent if the event date is today, the price and deposit snapshot, the customer details, and the reference code and QR hash from WF-02. | Create: reservation | [reservation-lifecycle][lc] §3.1, §3.2, §4.2 row 1; [catalog-and-payments][cat] §2.2; [D-12][dl]; [BR-06a][br] |
+| 16 | Database | In the same step: writes the audit entry (actor "customer"); queues the request-received email (only if an email was given) and the new-online-request email to both admins (urgent ones marked); saves the key against the reservation. | Create: audit entry, outbox rows, duplicate-submission key | [FR-PUB-06][fr], [FR-ADM-32][fr], [FR-NTF-01][fr], [FR-NTF-13][fr], [FR-NTF-16][fr] |
+| 17 | Next.js server | Shows the confirmation page (WF-02). | — | [FR-PUB-07][fr] |
+| 18 | Next.js server, Resend | Right after the reply, tries to send the queued emails. The every-minute job sends anything still waiting, with retries and caps: the email pipeline, [WF-07A](notifications-and-tracking.md). | Update: outbox status | [FR-NTF-16 to FR-NTF-20][fr], [FR-SYS-03][fr] |
+| 19 | Admins | See the new request on the dashboard, urgent ones marked, and in their email. They review it in [WF-04](lookup-and-review.md). | Read | [FR-ADM-02][fr], [FR-NTF-13][fr], [BR-06a][br] |
 
 ### Decision points and validation
 
@@ -489,6 +499,7 @@ sequenceDiagram
 | Turnstile passed and honeypot empty? | Refused | A bot-check message (wording: open question 5) | [NFR-12][nfr], [FR-PUB-06][fr] |
 | Every field valid (mobile form, venue for delivery, note length, a date inside the booking window, an active slot, an arrival inside on-site hours)? | Refused | Messages next to the fields; the form keeps the data | [FR-PUB-04][fr], [FR-PUB-05][fr], [BR-09][br], [BR-11][br], [reservation-lifecycle][lc] §4.2 row 1 |
 | Is the duplicate-submission key new? | Not a failure: the same reservation is returned | The same confirmation and reference code | [FR-PUB-06][fr], [EC-01][ec] |
+| Is the event date inside the booking window, at the moment of Submit (database)? | Refused | A clear message; the form keeps the data | [BR-09][br], [reservation-lifecycle][lc] §4.2 row 1, [EC-08][ec] |
 | Start at least the notice period after Submit? | Refused | "Too soon"; message or call the business | [BR-06][br] |
 | Hold limits met for this mobile number? | Refused | A clear message | [BR-07][br] |
 | Online booking open, and not the 7th online request in 60 minutes? | Refused; on the 7th, online booking also pauses | "Please message or call us" | [BR-07a][br] |
@@ -502,14 +513,14 @@ sequenceDiagram
 | Double click, a retry after a network error, or a second tab | The same reservation and reference code come back; no second request is created | [EC-01][ec] |
 | A new website version went live while the form was open | After the reload, the kept draft and key are sent; a repeat cannot create a second request | [EC-02][ec] |
 | Someone else took the set, the room, or the stock while the customer was filling in the form | "Just taken"; the form keeps the data and suggests other dates | [EC-03][ec] |
-| Two customers press Submit at the same instant for the last set | Exactly one gets it; the other sees "just taken" | [EC-04][ec] |
+| Two customers press Submit at the same instant for the last set | Exactly one gets it; the other sees "just taken" ([WF-05C](availability-and-conflicts.md)) | [EC-04][ec] |
 | Not enough add-on stock, although the calendar showed Available | Refused with a clear message; the form keeps the data | [EC-05][ec] |
-| The start is too soon at the moment of Submit | Refused; the customer can message or call, and an admin can create the booking | [EC-06][ec], [EC-41][ec] |
+| The start is too soon at the moment of Submit | Refused; the customer can message or call, and an admin can create the booking ([WF-04G](lookup-and-review.md)) | [EC-06][ec], [EC-41][ec] |
 | The same mobile number, typed differently, for a date where it already has an open request | Refused: the numbers are compared in the standard form | [EC-09][ec] |
 | A mobile number that already has 2 open online requests | Refused | [EC-10][ec] |
 | An invalid mobile number reaches the server | Refused with a clear message | [EC-11][ec] |
 | A bot floods the form | Turnstile, the honeypot, and the rate limit stop most; hold limits and the breaker catch the rest; admins reject fakes | [EC-14][ec] |
-| The 7th online request within 60 minutes | Refused; online booking pauses; both admins get one email; the dashboard shows a banner | [EC-15][ec] |
+| The 7th online request within 60 minutes | Refused; online booking pauses; both admins get one email; the dashboard shows a banner; either admin can end the pause early ([WF-08G](administration.md)) | [EC-15][ec] |
 | An admin blocks the same set at the same moment | Only one succeeds; if the block wins, the customer sees "just taken" | [EC-17][ec] |
 | An overdue hold sits on the date | It counts as expired; this request can take the set | [EC-22][ec] |
 | The email service fails, the daily cap is reached, or a send is retried | The request stands; the email is retried, held until the next day, or marked failed; never sent twice | [EC-66][ec], [EC-67][ec], [EC-68][ec] |
@@ -517,13 +528,13 @@ sequenceDiagram
 ### Status transitions involved
 
 - *(new)* → **Pending Confirmation**: [reservation-lifecycle][lc] §4.2, row 1 (actor "customer"). The deadline rules are in §3.2.
-- **Overdue holds → Expired** (other reservations, tidied up in step 8): rows 9 and 10, actor "system" ([reservation-lifecycle][lc] §3.3).
+- **Overdue holds → Expired** (other reservations, tidied up in step 8): rows 9 and 10, actor "system", each with its audit entry and expired email ([reservation-lifecycle][lc] §3.3, §4.1). Recording Expired in general is [WF-06F](changes-and-expiry.md).
 - **Refusals** create no reservation and change no status. A breaker trip changes the online-booking pause setting, not a status ([BR-07a][br]).
 
 ### Developer notes
 
 - **Server action:** `submitReservation`, in the public module tree, apart from admin code ([roles][roles] §7).
-- **Database function:** `app.book_reservation(...)` (the name used in [FR-PUB-06][fr]). It returns either `ok` with the reservation ID, reference code, and QR token, or a refusal reason such as `duplicate`, `too_soon`, `hold_limit_date`, `hold_limit_total`, `paused`, `breaker_tripped`, `sold_out`, or `addon_short` ([spec v0.2][spec] §12 names `sold_out`).
+- **Database function:** `app.book_reservation(...)` (the name used in [FR-PUB-06][fr]). It returns either `ok` with the reservation ID, reference code, and QR token, or a refusal reason such as `duplicate`, `outside_window`, `too_soon`, `hold_limit_date`, `hold_limit_total`, `paused`, `breaker_tripped`, `sold_out`, or `addon_short` ([spec v0.2][spec] §12 names `sold_out`).
 - **Breaker trip must commit.** On a trip, the function should return a refusal result rather than raise an error. Otherwise the transaction would roll back, and the pause, its admin email, and its audit entry would be lost ([BR-07a][br]).
 - **Duplicate key.** Store only its hash; it is deleted after 72 hours by the retention job ([privacy-and-retention][priv] §6.2). The check must be atomic with the insert, because a double click sends two requests at once: check it inside the function after the lock, or rely on a unique index on the hash. A Turnstile token is single-use, so a retry with the same duplicate key needs a fresh token from the browser.
 - **Rate limit.** The counters live in the database ([spec v0.2][spec] §10), keyed by an HMAC of the IP with a daily key ([NFR-11][nfr], [FR-SYS-06][fr]). Whether the check runs in its own call or inside `app.book_reservation` is for api-specification.
@@ -554,11 +565,11 @@ Every new request gets two things: a **reference code**, such as `KSB-7Q2M-K9TX`
 | Postgres booking function | Makes the reference code (retrying on a clash) and stores only a hash of the QR token, in the same step as WF-01C |
 | Next.js server | Builds the QR link, draws the QR code, shows the confirmation page, sends the queued email after the reply |
 | Customer | Keeps the reference code and the QR code and uses them as [D-09][dl] says |
-| Outbox, Resend, pg_cron | Hold, send, and retry the request-received email ([FR-NTF-16 to FR-NTF-20][fr]) |
+| Outbox, Resend, pg_cron | Hold, send, and retry the request-received email: the email pipeline, [WF-07A](notifications-and-tracking.md) ([FR-NTF-16 to FR-NTF-20][fr]) |
 
 ### Trigger and preconditions
 
-- **Trigger:** WF-01C has passed every check (step 13) and is saving the reservation (step 14).
+- **Trigger:** WF-01C has passed every check (step 14) and is saving the reservation (step 15).
 - **Preconditions:** none beyond WF-01C. The same steps also run when an admin creates a booking ([FR-ADM-24][fr]) or recreates an expired request ([FR-ADM-21][fr]); those admin flows are in the sibling workflow docs ([lookup-and-review](lookup-and-review.md), [changes-and-expiry](changes-and-expiry.md)).
 
 ### Flowchart
@@ -577,24 +588,18 @@ flowchart TD
     ST1 --> D2{"Email address given?"}
     D2 -->|"No"| G8["No email<br/>customer follows the status page"]
     D2 -->|"Yes"| G9["Request-received email queued<br/>reference code and QR link"]
-    G9 --> D3{"Sent?"}
-    D3 -->|"Yes"| G10["Email accepted by Resend"]
-    D3 -->|"Temporary error"| G11["Retried by the every-minute job"]
-    G11 --> D3
-    D3 -->|"Daily cap reached"| G12["Waits until the next day"]
-    D3 -->|"Permanent error or<br/>last attempt failed"| X1["Marked failed<br/>shown on the health panel"]
+    G9 --> G10["Sent by the email pipeline:<br/>WF-07A"]
     classDef customer fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
     classDef system fill:#f5f5f5,stroke:#616161,color:#212121
     classDef admin fill:#fff3e0,stroke:#ef6c00,color:#e65100
     classDef status fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
     class G7,G8 customer
-    class G1,G2,D1,G3,G4,G5,G6,D2,G9,D3,G10,G11,G12 system
+    class G1,G2,D1,G3,G4,G5,G6,D2,G9,G10 system
     class ST1 status
-    class X1 failure
 ```
 
-The health panel that shows failed emails is for the admins ([FR-ADM-33][fr]).
+Sending, retries, the caps, failed emails, and the admins' health panel are the email pipeline, [WF-07A](notifications-and-tracking.md).
 
 ### Sequence diagram
 
@@ -605,7 +610,6 @@ sequenceDiagram
     participant O as Outbox table
     actor C as Customer browser
     participant R as Resend
-    participant J as pg_cron and pg_net
     N->>DB: app.book_reservation, all checks passed
     DB->>DB: Make a reference code, retry if already used
     DB->>DB: Make a QR token, keep only its SHA-256 hash
@@ -615,18 +619,7 @@ sequenceDiagram
     N->>N: Build the QR link and draw the QR as SVG
     N-->>C: Confirmation page with Not yet confirmed
     N->>R: Send the queued email after the reply
-    alt accepted
-        R-->>N: Accepted
-        N->>O: Mark sent
-    else temporary error
-        R-->>N: Network error, 429 or 5xx
-        N->>O: Keep queued with a later attempt time
-        J->>N: Every minute, call /api/jobs/tick
-        N->>R: Retry the email
-    else permanent error
-        R-->>N: Another 4xx error
-        N->>O: Mark failed, shown on the health panel
-    end
+    Note over N,R: Retries, caps, and failures: WF-07A
 ```
 
 ### Steps
@@ -635,14 +628,14 @@ sequenceDiagram
 |---|---|---|---|---|
 | 1 | Database | Makes the **reference code** in the form `KSB-XXXX-XXXX` from the 31 allowed characters **[P]**, with a cryptographically secure random generator. If the code is already used, it tries again. | Create: reference code (unique) | [FR-PUB-08][fr], [NFR-13][nfr] |
 | 2 | Database | Makes the **QR token** (160 random bits **[P]**) and stores only its SHA-256 hash, so a leaked database reveals no working QR links. | Create: QR token hash | [FR-PUB-08][fr], [NFR-13][nfr] |
-| 3 | Database | Saves both with the reservation, in the same step as WF-01C step 14. | Create: reservation (reference code, QR token hash) | [reservation-lifecycle][lc] §4.2 row 1 |
+| 3 | Database | Saves both with the reservation, in the same step as WF-01C step 15. | Create: reservation (reference code, QR token hash) | [reservation-lifecycle][lc] §4.2 row 1 |
 | 4 | Next.js server | Receives the reference code and the QR token once. Builds the QR link `https://<domain>/r/<token>` **[P]** (the domain is O-05) and draws the QR code. The token itself is not stored. | — | [FR-PUB-08][fr], O-05, [NFR-31][nfr] |
 | 5 | Next.js server | Shows the **confirmation page**: the reference code as text, the QR code, a clear "Not yet confirmed" notice, and the next steps. Nothing on the page says or suggests that the booking is approved or paid. | — | [FR-PUB-07][fr], [D-09][dl], [NFR-17][nfr] (item 6), [project-charter][charter] §2 (criterion 3) |
-| 6 | Database | If an email address was given, the **request-received email** (reference code, QR link, "not yet confirmed") was queued in WF-01C step 15. | Create: outbox row | [FR-NTF-01][fr], [FR-NTF-16][fr] |
-| 7 | Next.js server, Resend, pg_cron | Sends the email after the reply; retries temporary errors; holds it at the cap; marks it failed after the last attempt. | Update: outbox status | [FR-NTF-16 to FR-NTF-20][fr], [FR-SYS-03][fr] |
-| 8 | Customer | Keeps the reference code and the QR code. Shows the QR at the office or when paying; quotes the code when messaging or calling; checks the status page with the code and the full mobile number ([WF-07](notifications-and-tracking.md)). | — | [D-09][dl], [FR-PUB-10][fr] |
+| 6 | Database | If an email address was given, the **request-received email** (reference code, QR link, "not yet confirmed") was queued in WF-01C step 16. | Create: outbox row | [FR-NTF-01][fr], [FR-NTF-16][fr] |
+| 7 | Next.js server, Resend, pg_cron | Sent through the email pipeline, [WF-07A](notifications-and-tracking.md): after the reply, with retries, caps, and failures handled there. | Update: outbox status | [FR-NTF-16 to FR-NTF-20][fr], [FR-SYS-03][fr] |
+| 8 | Customer | Keeps the reference code and the QR code. Shows the QR at the office or when paying; quotes the code when messaging or calling; checks the status page with the code and the full mobile number ([WF-07D](notifications-and-tracking.md)). | — | [D-09][dl], [FR-PUB-10][fr] |
 
-**What happens later** (other workflows): opening the QR link ([FR-PUB-09][fr]) and admin scanning ([FR-ADM-06][fr]) are in [WF-03](lookup-and-review.md). Reissuing a QR code ([FR-PUB-13][fr], [FR-ADM-22][fr]) is in [WF-03](lookup-and-review.md) and [WF-06](changes-and-expiry.md). The QR link stops working when the reservation becomes Rejected, Cancelled, Expired, or Completed ([FR-PUB-08][fr]; [reservation-lifecycle][lc] §4.2).
+**What happens later** (other workflows): opening the QR link ([FR-PUB-09][fr]) and admin scanning ([FR-ADM-06][fr]) are in [WF-03](lookup-and-review.md). Admin reissue ([FR-ADM-22][fr]): WF-03D in [lookup-and-review](lookup-and-review.md); customer reissue on the status page ([FR-PUB-13][fr]): WF-07D steps 9 to 11 in [notifications-and-tracking](notifications-and-tracking.md). The QR link stops working when the reservation becomes Rejected, Cancelled, Expired, or Completed ([FR-PUB-08][fr]; [reservation-lifecycle][lc] §4.2).
 
 ### Decision points and validation
 
@@ -650,7 +643,7 @@ sequenceDiagram
 |---|---|---|---|
 | Is the new reference code already used? | Make another one | Keep it | [FR-PUB-08][fr] |
 | Did the customer give an email address? | Queue the request-received email | No email; the status page is the source of truth | [FR-NTF-01][fr], [FR-NTF-21][fr] |
-| Was the email accepted by Resend? | Marked sent | Temporary error: retried; at the cap: next day; permanent error or last attempt: failed | [FR-NTF-18][fr], [FR-NTF-20][fr] |
+| Was the email accepted by Resend? | Marked sent | Retried, held, or marked failed, as in [WF-07A](notifications-and-tracking.md) | [FR-NTF-18][fr], [FR-NTF-20][fr] |
 | Is this a repeat of an earlier submission (same key)? | The same reference code is shown again (how the QR is shown: open question 2) | New codes are made | [FR-PUB-06][fr], [EC-01][ec] |
 
 ### Failure and exception paths
@@ -663,7 +656,7 @@ sequenceDiagram
 | The daily or monthly email cap is reached | Customer emails go first; leftovers go out the next day | [EC-67][ec] |
 | The same email is queued twice, or a send is retried | The customer receives it only once | [EC-68][ec] |
 | The customer thinks the QR code means "confirmed" | The page and the email say "Not yet confirmed"; only an admin action confirms | [FR-PUB-07][fr], [reservation-lifecycle][lc] §1.1 |
-| The customer loses or shares the QR code | A new QR code can be issued; the old one stops working ([WF-03](lookup-and-review.md), [WF-06](changes-and-expiry.md)) | [EC-62][ec] |
+| The customer loses or shares the QR code | A new QR code can be issued; the old one stops working. Admin reissue ([FR-ADM-22][fr]): WF-03D in [lookup-and-review](lookup-and-review.md); customer reissue on the status page ([FR-PUB-13][fr]): WF-07D steps 9 to 11 in [notifications-and-tracking](notifications-and-tracking.md) | [EC-62][ec] |
 | Someone else scans the QR code, or opens a guessed link | "Present this at our office", or "not found / no longer valid"; no data shown ([WF-03](lookup-and-review.md)) | [EC-60][ec], [EC-61][ec] |
 
 ### Status transitions involved
@@ -708,7 +701,7 @@ These are not decided here. If the reviewers agree they need an answer, add each
 5. **The first server checks.** Batch-1 docs do not fix the order of the rate limit, honeypot, Turnstile, field validation, and the duplicate-key check, whether a repeat with the same key counts toward the submission rate limit, or what a request caught by the honeypot or Turnstile is shown. (api-specification and security, batch 3.)
 6. **Recording the policy agreement.** The customer must agree to the policies before Submit ([FR-PUB-06][fr]). Is the agreement stored (for example the time and the version of the notice), and if so, for how long? ([privacy-and-retention][priv]; lawyer review, O-08.)
 7. **Is the name required?** [FR-PUB-05][fr] lists the name but does not say whether it is required (the mobile number is required, the email optional). Acknowledgments print it as "received from" ([catalog-and-payments][cat] §5.3).
-8. **Expiring overdue holds inside the booking function.** [BR-09][br] (developer note) says the function expires stale holds. Does it expire every overdue hold, or only those on the requested date? Does each one also queue the expired email and write an audit entry, as the every-minute job does ([FR-SYS-01][fr])? (api-specification, batch 3.)
+8. **Which overdue holds the booking function expires.** [BR-09][br] and [FR-PUB-06][fr] (developer notes) say the function expires stale holds before it claims (WF-01C step 8). Does it expire every overdue hold, or only those on the requested date and service type? (Each one is the normal "deadline passed" change, with its audit entry and expired email: [reservation-lifecycle][lc] §4.1 and rows 9 and 10. A reschedule expires those on the target date, lifecycle §6.5.) This is the one place this question is kept; [availability-and-conflicts](availability-and-conflicts.md) WF-05B, [changes-and-expiry](changes-and-expiry.md) WF-06F, and [notifications-and-tracking](notifications-and-tracking.md) WF-07B link here. (api-specification, batch 3.)
 9. **The form without a date.** The home page links straight to the reservation form ([FR-PUB-01][fr]), but [FR-PUB-03][fr] describes reaching the form from the calendar with the date filled in. Does the form have its own date picker, or send the customer to the calendar first? (planned: `04-design/ux-and-sitemap.md`.)
 10. **"Suggests other dates".** After "just taken", the form suggests other dates ([FR-PUB-06][fr], [EC-03][ec]). How: a link back to the calendar, or a short list of nearby Available dates? (planned: `04-design/ux-and-sitemap.md`.)
 11. **Saving the QR code.** A customer without email has only the confirmation page and the status page. Can the QR code be downloaded or saved from the confirmation page, or is a screenshot expected? (planned: `04-design/ux-and-sitemap.md`.)

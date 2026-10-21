@@ -5,7 +5,7 @@ These documents are the **source of truth** for the reservation system, which ha
 - **The developer**, who holds the Super Admin account and builds the system.
 - **The business owner**, who holds the Admin account and runs daily reservations.
 
-> **Current stage:** documentation, batch 1 of 4, is drafted and ready for review. The approved [design spec](superpowers/specs/2026-10-21-kasoundbox-design.md) is **frozen** as the design record. New changes go into these docs, never into the spec.
+> **Current stage:** documentation batches 1 and 2 are drafted. The approved [design spec](superpowers/specs/2026-10-21-kasoundbox-design.md) is **frozen** as the design record. New changes go into these docs, never into the spec.
 
 ## Where to start
 
@@ -75,12 +75,12 @@ Status key: **Draft** = written, awaiting review · **Planned** = not yet writte
 | [Reservation Lifecycle](02-domain/reservation-lifecycle.md) | Statuses, transitions, deadlines, admin actions | Draft |
 | [Catalog and Payments](02-domain/catalog-and-payments.md) | Packages, add-ons, prices, payments ledger, acknowledgments | Draft |
 | **03 — Workflows (batch 2)** | | |
-| `03-workflows/booking-and-submission.md` | WF-01 browse and submit, WF-02 reference code and QR | Planned |
-| `03-workflows/availability-and-conflicts.md` | WF-05 availability and conflict prevention | Planned |
-| `03-workflows/lookup-and-review.md` | WF-03 scan/search, WF-04 review and decisions | Planned |
-| `03-workflows/changes-and-expiry.md` | WF-06 cancel, reschedule, expire | Planned |
-| `03-workflows/notifications-and-tracking.md` | WF-07 notifications and status tracking | Planned |
-| `03-workflows/administration.md` | WF-08 catalog, WF-09 login and roles, WF-10 audit | Planned |
+| [Booking and Submission](03-workflows/booking-and-submission.md) | WF-01 browse and submit, WF-02 reference code and QR | Draft |
+| [Availability and Conflicts](03-workflows/availability-and-conflicts.md) | WF-05 availability and conflict prevention | Draft |
+| [Lookup and Review](03-workflows/lookup-and-review.md) | WF-03 scan/search, WF-04 review and decisions | Draft |
+| [Changes and Expiry](03-workflows/changes-and-expiry.md) | WF-06 cancel, reschedule, extend, edit, expire, payments | Draft |
+| [Notifications and Tracking](03-workflows/notifications-and-tracking.md) | WF-07 emails, status page, proof upload | Draft |
+| [Administration](03-workflows/administration.md) | WF-08 catalog and settings, WF-09 login and roles, WF-10 audit and retention | Draft |
 | **04 — Design (batch 3)** | | |
 | `04-design/ux-and-sitemap.md` | Sitemap, page inventory, layout guidelines | Planned |
 | **05 — Technical (batch 3)** | | |

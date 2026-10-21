@@ -1,77 +1,96 @@
 # DJB Kasoundbox — Reservation System Documentation
 
-Source of truth for planning the Videoke Reservation and Party Needs Management System: a public customer website and a private admin panel.
+These documents are the **source of truth** for the reservation system, which has two parts: a public customer website and a private admin panel. They are written for two readers:
 
-> **Current stage:** Design. Start with the [Design Spec](superpowers/specs/2026-10-21-kasoundbox-design.md), which is the current source of truth. The index below is the planned documentation set; it will be revised after the spec is approved.
+- **The developer**, who holds the Super Admin account and builds the system.
+- **The business owner**, who holds the Admin account and runs daily reservations.
+
+> **Current stage:** documentation, batch 1 of 4, is drafted and ready for review. The approved [design spec](superpowers/specs/2026-10-21-kasoundbox-design.md) is **frozen** as the design record. New changes go into these docs, never into the spec.
+
+## Where to start
+
+| If you are… | Read these first |
+|---|---|
+| **The business owner (Admin)** | [Project Charter](00-project/project-charter.md) → [Glossary](00-project/glossary.md) → [Business Rules](01-requirements/business-rules.md) → [Reservation Lifecycle](02-domain/reservation-lifecycle.md) → [Catalog and Payments](02-domain/catalog-and-payments.md) → [Edge Cases](01-requirements/edge-cases.md) |
+| **The developer (Super Admin)** | All of the above, then [Functional Requirements](01-requirements/functional-requirements.md), [Non-Functional Requirements](01-requirements/non-functional-requirements.md), [Roles and Permissions](01-requirements/roles-and-permissions.md), [Privacy and Retention](01-requirements/privacy-and-retention.md) and the [Decision Log](00-project/decision-log.md) |
 
 ## Conventions
 
-**Labels** — every requirement or statement is tagged with one of:
+**Labels.**
 
 | Label | Meaning |
 |---|---|
-| **[C] Confirmed** | Stated by DJB Kasoundbox |
-| **[P] Proposed** | Recommendation; needs approval |
-| **[A] Assumption** | Treated as true for now; must be confirmed |
-| **[O] Open** | Decision required |
+| **[C]** | Confirmed decision (see the decision log) |
+| **[P]** | Proposed. Accepted when the spec was approved, but may still change |
+| **[U]** | Unverified fact. It must be checked in the week-1 test or before launch |
+| **[O-nn]** | Open item that still needs input (see the decision log) |
 
-**IDs** — used to link documents, implementation tasks, and tests:
+**IDs.**
 
 | Prefix | Item | Defined in |
 |---|---|---|
-| `D-xx` | Decision | `00-project/decision-log.md` |
-| `Q-xx` | Open question | `00-project/decision-log.md` |
-| `FR-xx` | Functional requirement | `01-requirements/functional-requirements.md` |
-| `NFR-xx` | Non-functional requirement | `01-requirements/non-functional-requirements.md` |
-| `BR-xx` | Business rule | `01-requirements/business-rules.md` |
-| `EC-xx` | Edge case | `01-requirements/edge-cases.md` |
-| `WF-xx` | Workflow | `03-workflows/*.md` |
-| `TC-xx` | Test case | `06-delivery/test-plan.md` |
+| `D-xx` | Decision | [Decision Log](00-project/decision-log.md) |
+| `O-xx` | Open item | [Decision Log](00-project/decision-log.md) |
+| `BR-xx` | Business rule | [Business Rules](01-requirements/business-rules.md) |
+| `FR-PUB-xx`, `FR-ADM-xx`, `FR-NTF-xx`, `FR-SYS-xx` | Functional requirement for the public site, admin panel, notifications, and system jobs | [Functional Requirements](01-requirements/functional-requirements.md) |
+| `NFR-xx` | Non-functional requirement | [Non-Functional Requirements](01-requirements/non-functional-requirements.md) |
+| `EC-xx` | Edge case | [Edge Cases](01-requirements/edge-cases.md) |
+| `TC-xx` | Test case | Test plan (batch 4) |
 
-**Single sources** — statuses are defined only in `reservation-lifecycle.md`, permissions only in `roles-and-permissions.md`, rules only in `business-rules.md`. Other documents link to them instead of restating them.
+**Single source.** Each rule lives in exactly one document; the others link to it.
 
-**Changing a decision** — update `decision-log.md` first, then every document listed in that decision's "Documents affected" column.
+| Topic | Its single source |
+|---|---|
+| Statuses, transitions, and deadlines | [Reservation Lifecycle](02-domain/reservation-lifecycle.md) |
+| Permissions | [Roles and Permissions](01-requirements/roles-and-permissions.md) |
+| Capacity and booking limits | [Business Rules](01-requirements/business-rules.md) |
+| Prices and money | [Catalog and Payments](02-domain/catalog-and-payments.md) |
+| Retention and privacy | [Privacy and Retention](01-requirements/privacy-and-retention.md) |
 
-**Diagrams** — Mermaid inside Markdown (rendered by GitHub).
+**Changing a decision.** Update the [Decision Log](00-project/decision-log.md) first. Then update every document listed under that decision's "Docs affected".
+
+**Diagrams** are Mermaid, written inside the Markdown files. GitHub renders them.
 
 ## Document index
 
-Status: **Draft** = written, under review · **Planned** = not yet written · **Final** = approved.
+Status key: **Draft** = written, awaiting review · **Planned** = not yet written · **Final** = approved · **Frozen** = kept as a record, never edited.
 
 | Document | Purpose | Status |
 |---|---|---|
-| **00 — Project** | | |
-| [Design Spec](superpowers/specs/2026-10-21-kasoundbox-design.md) | Approved design from brainstorming: rules, lifecycle, stack, security, testing | Draft (owner review) |
-| [Discovery Brief](00-project/discovery-brief.md) | Round 1 analysis (history only) | Superseded |
-| [Project Charter](00-project/project-charter.md) | Goals, stakeholders, scope, MVP vs later | Planned |
-| [Glossary](00-project/glossary.md) | Canonical terms and status names | Planned |
-| [Decision Log](00-project/decision-log.md) | Decisions, open questions, assumptions | Planned |
-| **01 — Requirements** | | |
-| [Roles and Permissions](01-requirements/roles-and-permissions.md) | Roles and permission matrix | Planned |
-| [Functional Requirements](01-requirements/functional-requirements.md) | FR-xx with MVP flag and acceptance criteria | Planned |
-| [Non-Functional Requirements](01-requirements/non-functional-requirements.md) | Performance, security, privacy, devices | Planned |
-| [Business Rules](01-requirements/business-rules.md) | BR-xx rules with examples | Planned |
-| [Edge Cases](01-requirements/edge-cases.md) | Scenario → expected behavior → rule → test | Planned |
-| **02 — Domain** | | |
-| [Reservation Lifecycle](02-domain/reservation-lifecycle.md) | Statuses, state diagram, transitions | Planned |
-| [Catalog and Pricing](02-domain/catalog-and-pricing.md) | Packages, add-ons, price calculation | Planned |
-| **03 — Workflows** | | |
-| [Booking and Submission](03-workflows/booking-and-submission.md) | WF-01, WF-02 | Planned |
-| [Availability and Conflicts](03-workflows/availability-and-conflicts.md) | WF-05 | Planned |
-| [Lookup and Review](03-workflows/lookup-and-review.md) | WF-03, WF-04 | Planned |
-| [Changes and Expiry](03-workflows/changes-and-expiry.md) | WF-06 | Planned |
-| [Notifications and Tracking](03-workflows/notifications-and-tracking.md) | WF-07 | Planned |
-| [Administration](03-workflows/administration.md) | WF-08, WF-09, WF-10 | Planned |
-| **04 — Design** | | |
-| [UX and Sitemap](04-design/ux-and-sitemap.md) | Sitemap, page inventory, layout guidelines | Planned |
-| **05 — Technical** | | |
-| [Architecture](05-technical/architecture.md) | Stack evaluation, components, hosting | Planned |
-| [Data Model](05-technical/data-model.md) | ERD, tables, constraints | Planned |
-| [API Specification](05-technical/api-specification.md) | Public and admin endpoints | Planned |
-| [Security](05-technical/security.md) | Threats and controls | Planned |
-| **06 — Delivery** | | |
-| [Roadmap](06-delivery/roadmap.md) | Phases, milestones, MVP backlog | Planned |
-| [Test Plan](06-delivery/test-plan.md) | Test cases, UAT, traceability | Planned |
-| **07 — Operations** | | |
-| [Deployment and Operations](07-operations/deployment-and-operations.md) | Deploy, backup/restore, monitoring | Planned |
-| [Staff Guide](07-operations/staff-guide.md) | Staff procedures in the admin panel | Planned |
+| **Design record** | | |
+| [Design Spec v0.2](superpowers/specs/2026-10-21-kasoundbox-design.md) | The approved design from brainstorming | Frozen |
+| [Discovery Brief](00-project/discovery-brief.md) | Round 1 analysis | Superseded (history only) |
+| **00 — Project (batch 1)** | | |
+| [Project Charter](00-project/project-charter.md) | Why we're building this, scope, stakeholders, constraints, phases | Draft |
+| [Glossary](00-project/glossary.md) | Plain meaning of every term | Draft |
+| [Decision Log](00-project/decision-log.md) | Decisions D-01–D-23 and open items O-01–O-11 | Draft |
+| **01 — Requirements (batch 1)** | | |
+| [Roles and Permissions](01-requirements/roles-and-permissions.md) | Who can do what | Draft |
+| [Business Rules](01-requirements/business-rules.md) | Capacity, holds, limits, blocks, calendar (BR-01–BR-12) | Draft |
+| [Functional Requirements](01-requirements/functional-requirements.md) | What the system must do, with acceptance criteria | Draft |
+| [Non-Functional Requirements](01-requirements/non-functional-requirements.md) | Cost, hosting, security, privacy, mobile, backups, maintenance | Draft |
+| [Edge Cases](01-requirements/edge-cases.md) | Unusual situations and how the system behaves | Draft |
+| [Privacy and Retention](01-requirements/privacy-and-retention.md) | Data Privacy Act duties, retention schedule, acknowledgment wording | Draft |
+| **02 — Domain (batch 1)** | | |
+| [Reservation Lifecycle](02-domain/reservation-lifecycle.md) | Statuses, transitions, deadlines, admin actions | Draft |
+| [Catalog and Payments](02-domain/catalog-and-payments.md) | Packages, add-ons, prices, payments ledger, acknowledgments | Draft |
+| **03 — Workflows (batch 2)** | | |
+| `03-workflows/booking-and-submission.md` | WF-01 browse and submit, WF-02 reference code and QR | Planned |
+| `03-workflows/availability-and-conflicts.md` | WF-05 availability and conflict prevention | Planned |
+| `03-workflows/lookup-and-review.md` | WF-03 scan/search, WF-04 review and decisions | Planned |
+| `03-workflows/changes-and-expiry.md` | WF-06 cancel, reschedule, expire | Planned |
+| `03-workflows/notifications-and-tracking.md` | WF-07 notifications and status tracking | Planned |
+| `03-workflows/administration.md` | WF-08 catalog, WF-09 login and roles, WF-10 audit | Planned |
+| **04 — Design (batch 3)** | | |
+| `04-design/ux-and-sitemap.md` | Sitemap, page inventory, layout guidelines | Planned |
+| **05 — Technical (batch 3)** | | |
+| `05-technical/architecture.md` | Components, hosting, portability | Planned |
+| `05-technical/data-model.md` | Entity-relationship diagram, tables, constraints | Planned |
+| `05-technical/api-specification.md` | Server actions, routes, database functions | Planned |
+| `05-technical/security.md` | Threats and controls | Planned |
+| **06 — Delivery (batch 4)** | | |
+| `06-delivery/roadmap.md` | Phases, milestones, MVP backlog | Planned |
+| `06-delivery/test-plan.md` | Test cases, acceptance testing, traceability | Planned |
+| **07 — Operations (batch 4)** | | |
+| `07-operations/deployment-and-operations.md` | Deploy, backup/restore, monitoring, incident runbook | Planned |
+| `07-operations/staff-guide.md` | Step-by-step admin panel procedures | Planned |

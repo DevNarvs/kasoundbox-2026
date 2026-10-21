@@ -1,6 +1,8 @@
 # Discovery Brief — Round 1
 
-> **Status:** Draft for review · **Version:** 0.1 · **Date:** 2026-10-21
+> **⚠️ SUPERSEDED (2026-10-21).** The Round 1 questions were answered during brainstorming, and several proposals changed. Examples: Needs Info became a flag, statuses changed, and the stack was chosen. The current source of truth is the [design spec](../superpowers/specs/2026-10-21-kasoundbox-design.md). This file is kept for history only; do not update it.
+
+> **Status:** Superseded · **Version:** 0.1 · **Date:** 2026-10-21
 > This is a snapshot of the first planning round. As each target document in [§4](#4-proposed-documentation-structure) is written, it supersedes the matching part of this brief. Once all are written, this file is frozen and kept for history only.
 
 **Labels used in all documents**

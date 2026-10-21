@@ -2,7 +2,7 @@
 
 Source of truth for planning the Videoke Reservation and Party Needs Management System: a public customer website and a private admin panel.
 
-> **Current stage:** Phase 1 — Discovery. Start with the [Discovery Brief](00-project/discovery-brief.md) and its Round 1 questions.
+> **Current stage:** Design. Start with the [Design Spec](superpowers/specs/2026-10-21-kasoundbox-design.md), which is the current source of truth. The index below is the planned documentation set; it will be revised after the spec is approved.
 
 ## Conventions
 
@@ -41,7 +41,8 @@ Status: **Draft** = written, under review · **Planned** = not yet written · **
 | Document | Purpose | Status |
 |---|---|---|
 | **00 — Project** | | |
-| [Discovery Brief](00-project/discovery-brief.md) | Round 1 analysis, draft workflow, open decisions, questions | Draft |
+| [Design Spec](superpowers/specs/2026-10-21-kasoundbox-design.md) | Approved design from brainstorming: rules, lifecycle, stack, security, testing | Draft (owner review) |
+| [Discovery Brief](00-project/discovery-brief.md) | Round 1 analysis (history only) | Superseded |
 | [Project Charter](00-project/project-charter.md) | Goals, stakeholders, scope, MVP vs later | Planned |
 | [Glossary](00-project/glossary.md) | Canonical terms and status names | Planned |
 | [Decision Log](00-project/decision-log.md) | Decisions, open questions, assumptions | Planned |

@@ -151,12 +151,13 @@ flowchart TD
 - "Too many tries. Please wait and try again later." After several wrong passwords the account is locked for a while (5 wrong passwords lock it for 15 minutes by default, [NFR-11][nfr]). Wait; trying again during the lock does not help ([EC-72][ec]).
 - Your phone is lost, stolen, or broken: press **"Use a backup code instead"** and follow [P-23](#p-23--you-lost-the-phone-with-the-2fa-app).
 
-**Your first login, or after a reset** ([WF-09B][wf-09b]): the screen first asks you to set up two-factor login.
+**Your first login, or after a reset** ([WF-09B][wf-09b]): the screen first asks you to choose a new password, then to set up two-factor login.
 
-1. Open the authenticator app and add the account with the QR code on the screen.
-2. Type the first code the app shows.
-3. The screen shows your **backup codes**. Press **"Print"** (or **"Download"**), and keep the paper somewhere safe at home, away from your phone ([roles §5.2][roles]).
-4. Tick **"I have stored my backup codes"**, then press **"Continue"**.
+1. Type a new password of your own, twice, and press **"Save"**. The first password, or the one from a reset, works only for this one login **[C]** ([D-36][dl]).
+2. Open the authenticator app and add the account with the QR code on the screen.
+3. Type the first code the app shows.
+4. The screen shows your **backup codes**. Press **"Print"** (or **"Download"**), and keep the paper somewhere safe at home, away from your phone ([roles §5.2][roles]).
+5. Tick **"I have stored my backup codes"**, then press **"Continue"**.
 
 ### 2.2 Check the dashboard, top to bottom
 
@@ -891,7 +892,7 @@ These hold for every action below, so the procedures do not repeat them ([FR-ADM
 
 1. Open **More → Catalog**. Pick the **Packages** or **Add-ons** tab.
 2. To add an item, use the add button on that tab; to edit one, open it.
-3. Fill in the fields: a package has a name, inclusions (one per line), and a price; an add-on has a name, a price, and a daily stock.
+3. Fill in the fields: a package has a name, inclusions (one per line), and a price; an add-on has a name, a price, and a daily stock. A price of ₱0.00 is allowed, for a free extra; a daily stock of 0 means the add-on cannot be booked until you raise it **[C]** ([D-35][dl]).
 4. Save. The public packages page shows the change.
 
 *Example:* on Monday 4 January 2027 you raise Package A from ₱3,000 to ₱3,500. Ana, who sent her request in December, still pays ₱3,000; a customer who submits on 5 January locks ₱3,500 **[C]** ([D-12][dl], [EC-55][ec]).
@@ -950,15 +951,16 @@ These hold for every action below, so the procedures do not repeat them ([FR-ADM
 1. Call the Super Admin at once, so he can sign out your sessions on the lost phone ([P-27](#p-27--manage-the-admin-account), "Sign out").
 2. On the login page, type your email and password, then press **"Use a backup code instead"**.
 3. Type one of your printed backup codes. Each code works only once; cross it off your paper.
-4. **No backup codes left?** Ask the Super Admin to reset your account ([P-27](#p-27--manage-the-admin-account), "Reset"). You get a new password and set up two-factor login again on your new phone ([section 2.1](#21-log-in)), and you are signed out everywhere else.
+4. **Move 2FA to your new phone.** Press **"Move 2FA"**, type your password and another backup code, add the account to the authenticator app on the new phone, and type its first code. The old phone's codes stop working. The Super Admin gets an email that you did this **[C]** ([D-36][dl]).
+5. **No backup codes left?** Ask the Super Admin to reset your account ([P-27](#p-27--manage-the-admin-account), "Reset"). You get a new password and set up two-factor login again on your new phone ([section 2.1](#21-log-in)), and you are signed out everywhere else.
 
 **Steps: the Super Admin** (the developer)
 
-1. Use one of your own backup codes, as above.
+1. Use one of your own backup codes, and move 2FA to the new phone, as above. No email is sent for your own account ([D-36][dl]).
 2. No backup codes left: run the break-glass script with the database credentials, following the runbook (planned: [deployment and operations][ops]; [WF-09E][wf-09e]). It resets your two-factor login and records this in the audit log.
 3. Log in with your password, set up two-factor login on the new phone, and print new backup codes.
 
-**What to check.** After you are back in, set up the authenticator app on the new phone. Whether you can do that yourself after using a backup code, or need a reset, is still open ([administration][wf-admin], open question 7).
+**What to check.** After you are back in, make sure the authenticator app works on the new phone, and print a new set of backup codes if few are left. You can move 2FA yourself after using a backup code; a reset is needed only when no codes are left **[C]** ([D-36][dl]).
 
 **Common mistakes.** Keeping the backup codes on the same phone. Keep them on paper, at home ([roles §5.2][roles]).
 
@@ -1008,7 +1010,7 @@ The Admin does not see these screens or options. If the Admin tries one anyway, 
 
 **What the customer sees.** New requests use the new value. Existing bookings keep their deposit, start time, and deadline ([EC-55][ec], [EC-56][ec]). *Example:* a request sent on Saturday 26 December keeps its ₱1,000 deposit; a request sent on 29 December gets ₱1,500.
 
-**What to check.** Which values are valid for each setting is still open ([administration][wf-admin], open question 13); read the field message if a value is refused.
+**What to check.** The valid values for each setting are the ranges proposed in the data model; the Super Admin reviews them later **[C]** ([D-35][dl]). Read the field message if a value is refused.
 
 **Common mistakes.** Looking for the "online booking paused until" value. It is shown as text only and cannot be edited; use "Resume online booking" ([P-22](#p-22--resume-online-booking-after-a-pause)).
 
@@ -1044,29 +1046,34 @@ The Admin does not see these screens or options. If the Admin tries one anyway, 
 **Steps: sign out** (for example, a phone or laptop was lost)
 
 1. Open **More → Accounts**.
-2. On the Admin's account, press **"Sign out"** and confirm. The lost device can no longer use the admin panel. Whether one session or all of them end is still open ([administration][wf-admin], open question 10).
+2. On the Admin's account, press **"Sign out"** and confirm. The lost device can no longer use the admin panel. All of that admin's sessions end ([security][sec] §4.1, accepted in [D-38][dl]).
 
 **Steps: reset** (the Admin lost his 2FA phone and has no backup codes left)
 
 1. Open **More → Accounts**. On the Admin's account, press **"Reset"** and confirm.
 2. The screen says "Password reset. The person must set up 2FA again and is signed out everywhere."
-3. Give the new password to the Admin (how is still open: [administration][wf-admin], open question 8).
-4. The Admin logs in and sets up two-factor login on his new phone ([section 2.1](#21-log-in)).
+3. Give the new password to the Admin in person, never by message ([security][sec] §4.1, accepted in [D-38][dl]).
+4. The Admin logs in, chooses a new password of his own, and sets up two-factor login on his new phone ([section 2.1](#21-log-in); [D-36][dl]).
 
 **Steps: disable** (the person stops being the Admin)
 
 1. Do it the same day the person stops being an admin ([privacy §6.2][priv], [EC-76][ec]).
-2. Open **More → Accounts**. On that account, press **"Disable"** and confirm. The person can no longer log in. Their login details are deleted within 30 days ([privacy §6.2][priv]).
+2. Open **More → Accounts**. On that account, press **"Disable"** and confirm. The person can no longer log in. The daily clean-up deletes their login details 30 days after the disable; the account stays with only the name, so the history and "received by" still show who it was ([privacy §6.2][priv]; **[C]** [D-37][dl]).
+
+**Steps: re-enable** (for example, a disable by mistake) **[C]** ([D-37][dl])
+
+1. Open **More → Accounts**. On the disabled account, press **"Re-enable"** and confirm. It works only while no other Admin is active.
+2. If the login details were already deleted (more than 30 days after the disable), also enter the email and a new password; the person then chooses a new password and sets up two-factor login again ([section 2.1](#21-log-in)).
 
 **Steps: create a new Admin**
 
 1. "Create Admin" is offered only when no Admin is active. Otherwise the screen says "Disable the current Admin first to create a new one." ([EC-75][ec]).
 2. Enter the name, the email, and a first password, and save.
-3. Give the first password to the person. They log in and set up two-factor login before the admin area opens ([section 2.1](#21-log-in)).
+3. Give the first password to the person, in person. They log in, choose a new password, and set up two-factor login before the admin area opens ([section 2.1](#21-log-in); [D-36][dl]).
 
 **What the customer sees.** Nothing. Account changes never touch bookings, and no email is sent.
 
-**What to check.** "Disable" is not offered on your own account: the Super Admin cannot disable himself ([roles §5.1][roles]). Every account action is recorded in the audit log.
+**What to check.** "Disable" is not offered on your own account: the Super Admin cannot disable himself ([roles §5.1][roles]). There is no "change role" action ([D-37][dl]). Every account action is recorded in the audit log. An email that the Admin moved 2FA, when you did not expect it, means: sign out and reset that account at once ([P-23](#p-23--you-lost-the-phone-with-the-2fa-app); [D-36][dl]).
 
 **Common mistakes.**
 
@@ -1086,6 +1093,7 @@ These are rare. The Admin passes the request to the Super Admin.
 | Set or clear a legal hold | A written complaint, demand letter, or case arrives about a booking. Give the letter to the Super Admin, who sets the hold with a reason so nothing about that booking is deleted ([EC-83][ec]) | [WF-10C][wf-10c]; [privacy §5.6][priv] |
 | Process an erasure request | A customer asks to have their personal data erased. The Super Admin checks the reference code and full mobile number first ([EC-84][ec]) | [WF-10D][wf-10d]; [privacy §5.5][priv] |
 | Delivery slots, sets, and the room | New slot times, a new set, or a set sold | [P-25](#p-25--change-a-setting); [WF-08D][wf-08d], [WF-08E][wf-08e] |
+| Open online booking at launch | Once, at launch, after every pre-launch gate is cleared. Until then the website shows "Opening soon" and takes no online request; phone, walk-in, and Facebook bookings still work **[C]** ([D-30][dl]) | **More → Settings**, "Online booking open" ([P-25](#p-25--change-a-setting)); [deployment and operations][ops] §10 |
 
 ---
 
@@ -1140,7 +1148,7 @@ Each row names the edge case (EC-xx) that defines what the system does, and the 
 |---|---|---|---|
 | **A customer says they got no email** | 1. Check that the booking has an email address and that it is spelled right; correct it if not ([P-11](#p-11--edit-details)). 2. Ask them to look in their spam folder. 3. Check the health panel for a failed email or a cap warning. 4. Tell them the status page always shows the true status. Until the follow-up for failed emails is decided, message or call them yourself **[P] (new in this doc)** | [EC-12][ec], [EC-66][ec], [EC-67][ec] | [section 2.5](#25-check-the-health-panel-super-admin) |
 | **Online booking is paused** | Look at the newest online requests, reject fakes, then resume or wait. Phone and walk-in bookings still work | [EC-14][ec], [EC-15][ec], [EC-45][ec] | [P-22](#p-22--resume-online-booking-after-a-pause) |
-| **You lost the phone with the 2FA app** | Use a backup code; if none are left, the Super Admin resets your account | [EC-71][ec] | [P-23](#p-23--you-lost-the-phone-with-the-2fa-app) |
+| **You lost the phone with the 2FA app** | Use a backup code, then move 2FA to your new phone yourself; if no codes are left, the Super Admin resets your account | [EC-71][ec] | [P-23](#p-23--you-lost-the-phone-with-the-2fa-app) |
 | "Too many tries" at login | The account is locked for a while after wrong passwords. Wait, then try again | [EC-72][ec] | [section 2.1](#21-log-in) |
 | A health-panel job shows **Failed**, or the expiry job has not run for a long time | Tell the Super Admin. Deadlines are still checked on every page, so bookings stay correct | [EC-77][ec] | Runbook (planned: [deployment and operations][ops]) |
 | The website does not open at all | Tell the Super Admin. How to take bookings meanwhile is still open | [EC-80][ec] | Runbook (planned: [deployment and operations][ops]) |
@@ -1200,7 +1208,7 @@ These are not decided here. If the reviewers agree an answer is needed, record i
 - On which statuses a QR code can be reissued ([lookup-and-review][wf-review], open question 7) · the QR code for a staff booking without email (question 14) · a double press of "Create booking" (question 11).
 - The prepared-message panel and reminder ([UX §8][ux-proposals], proposal 8; [notifications-and-tracking][wf-notify], open question 18) · reminders at night (question 9).
 - How soon a deadline counts as "soon" on the dashboard ([FR-ADM-02][fr], set while building).
-- Moving a booking to another set on the same date, and lowering an add-on's stock for one day ([administration][wf-admin], open question 18) · resuming early when the count is still high (question 17) · how a new or reset password is handed over (question 8) · 2FA on a new phone after a backup code (question 7) · signing out one session or all (question 10) · bringing back archived items (question 14).
+- Moving a booking to another set on the same date, and lowering an add-on's stock for one day ([administration][wf-admin], open question 18) · resuming early when the count is still high (question 17) · bringing back archived items (question 14). Answered since: how a new or reset password is handed over, and that it is changed at the next login (question 8; [D-36][dl], [D-38][dl]); moving 2FA to a new phone after a backup code (question 7; [D-36][dl]); signing out ends all sessions (question 10; [D-38][dl]); valid prices, stock, and setting values (question 13; [D-35][dl]).
 - A balance paid in parts, refunds that differ from the decision, and the payment date when cash is recorded a day later ([catalog §10][cat], questions 1, 3, and 7) · voided acknowledgments on the status page (question 5).
 - What staff do with sensitive data typed into a customer's note ([privacy §11][priv], question 9).
 - The screen and button names in this guide, which are proposals until the [UX doc][ux] is reviewed and the screens are built; the end-to-end tests for these procedures (planned: [test plan][test]) and the build order (planned: [roadmap][roadmap]).
@@ -1271,6 +1279,7 @@ These are not decided here. If the reviewers agree an answer is needed, record i
 [wf-10c]: ../03-workflows/administration.md#wf-10c--set-or-clear-a-legal-hold
 [wf-10d]: ../03-workflows/administration.md#wf-10d--process-an-erasure-request
 [ops]: deployment-and-operations.md
+[sec]: ../05-technical/security.md
 [test]: ../06-delivery/test-plan.md
 [roadmap]: ../06-delivery/roadmap.md
 [spec]: ../superpowers/specs/2026-10-21-kasoundbox-design.md

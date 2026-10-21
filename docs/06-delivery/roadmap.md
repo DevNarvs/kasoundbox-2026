@@ -23,7 +23,7 @@
 
 - **What this document owns.** The phases, the milestones, the order of the MVP backlog, the definition of done, and the gates. **Relative order only; no calendar dates [P].** It sets no dates and no estimates.
 - **What it does not own.** Every requirement, rule, permission, deadline, limit, and decision belongs to its owning document and is cited here by its ID (D-xx, O-xx, BR-xx, FR-…, NFR-xx, EC-xx, WF-xx) with a link, never restated. Function, route, and table names come from [api-specification][api] and [data-model][data]. Test cases (TC-xx) are in the [test plan][tp]. Runbooks are in [deployment and operations][ops].
-- **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. **[P] (new in this doc)** marks a planning proposal made for the first time here. The arrangement itself (which phase holds which feature, the milestones, and the gates that no other doc names as "before launch") is such a proposal, even where a line carries no label. Each one waits for review; the main ones are listed under [Open questions](#open-questions).
+- **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. **[P] (new in this doc)** marks a planning proposal made for the first time here. The arrangement itself (which phase holds which feature, the milestones, and the gates that no other doc names as "before launch") is such a proposal, even where a line carries no label. Each one waits for review; the main ones are listed under [Open questions](#open-questions). **[P] items listed in [D-38][dl] are accepted as the Foundation baseline** (open questions 3, 4, and 10).
 - **Local IDs.** Epics E1 to E20, features E1.1 and so on, and milestones M1 to M11 are local to this document **[P] (new in this doc)**. The implementation plan (section 9) and the [test plan][tp] can cite them.
 - **Page IDs.** P1 to P13 (public) and A1 to A13 (admin) are the pages of the [page inventory][ux] (ux-and-sitemap §2).
 - **Week-1 items.** "Week-1 item N" is item N of the week-1 list in spec v0.2 §17, as in [architecture][arch] §14.1.
@@ -84,26 +84,26 @@ The charter's "Build" phase is split here into phases 5 to 9, its "Test" phase i
 - **Goal.** Prove the risky technical parts on the real free services in Singapore before any feature is built ([charter][charter] §6, phase 4).
 - **Entry.**
   - M1 Docs approved.
-  - A Vercel Hobby project in `sin1` and a Supabase Free project in Singapore exist ([architecture][arch] §2.2).
+  - A Vercel Hobby project in `sin1` and a Supabase Free project in Singapore exist ([architecture][arch] §2.2). They are the separate test project, not production: the week-1 test and UAT run there, and it is the staging environment during the build **[C]** ([D-28][dl]).
   - O-07 is done, so Claude can save code to the repository **[P] (new in this doc)**; until then the developer pushes Claude's work himself.
   - The real phone and laptop that will be used for scanning are available for item 6 ([FR-ADM-06][fr]), including the Admin's if he will scan.
   - If item 7 uses the GitHub Actions backup job, O-06 is done first **[C]** (D-22).
 - **Exit (M2 Go / no-go).**
   - Each of the 8 week-1 items has passed, or its failure is fixed and the item is run again (spec v0.2 §17). What each item settles is listed in [architecture][arch] §14.1, plus the extra checks named there.
   - The **[U]** items each run settles are updated in their owning docs: [architecture][arch] §14.1, [security][sec] §7, [data-model][data] (for example the `admin_auth` schema fallback, data-model §2.1).
-  - The speed target is set from the measured latency ([NFR-03][nfr]).
+  - The speed target is set from the measured latency: the week-1 p95 plus a safety margin ([NFR-03][nfr]) **[C]** ([D-31][dl]).
   - A fix that would change a decision (for example a stack choice in D-20) goes into the [decision log][dl] first.
-  - The go / no-go result is recorded **[P] (new in this doc)**: see [Open questions](#open-questions), item 1.
-- **Deliverables.** A short results note per item; the first restore test ([NFR-29][nfr]); real usage figures against the Hobby allotments ([NFR-06][nfr]).
+  - The go / no-go result is recorded as a new decision in the [decision log][dl], with the next free D number, listing each item's result and its fix **[C]** ([D-31][dl]).
+- **Deliverables.** A short results note per item; the first restore test ([NFR-29][nfr]); real usage figures against the Hobby allotments ([NFR-06][nfr]). The spike code itself is a set of quick probes and is thrown away after M2 **[C]** ([D-32][dl]).
 
 ### 1.5 Foundation (repository, CI, schema, roles, auth with 2FA, settings)
 
 - **Goal.** An empty but complete skeleton: the repository, the automatic checks, the whole database structure, admin login with 2FA, accounts, and settings. Epics E1 to E4.
-- **Entry.** M2 is "go". O-07 is done.
+- **Entry.** M2 is "go". O-07 is done. Foundation is built properly, test-first, keeping no spike code **[C]** ([D-32][dl]). It deploys to the test project ([D-28][dl]), where online booking stays closed ([D-30][dl]).
 - **Exit (M3 Skeleton runs).**
   - Every step of `ci.yml` is green on `main` ([architecture][arch] §11.1); `supabase db reset` applies every migration from zero ([data-model][data] §10).
   - The database tests for roles and grants pass (the "Database" rows of [security][sec] §5).
-  - An admin created with the seed script logs in with 2FA; logged-out and wrong-role calls are refused ([security][sec] §5, "Authentication" and "Authorization"). The production accounts are created later, once (section 1.11).
+  - An admin created with the seed script logs in with 2FA; logged-out and wrong-role calls are refused ([security][sec] §5, "Authentication" and "Authorization"). The production accounts are created later, once, when production is created fresh just before launch (section 1.12; **[C]** [D-28][dl]).
   - The Super Admin can change a setting and a delivery slot; the change writes an audit entry.
   - `/api/health` reports the `sin1` region; the keep-alive runs.
 - **Deliverables.** The repository layout of [architecture][arch] §9; `ci.yml`, the Dockerfile, `dependabot.yml`; migrations for schemas, roles, enums, every table, the live-claim guard, and the shared helpers; `seed.sql`, `seed-admins.ts`, and the break-glass script; pages A1, A2, A10 (settings and slots), A11.
@@ -163,7 +163,7 @@ The charter's "Build" phase is split here into phases 5 to 9, its "Test" phase i
 ### 1.11 UAT with both admins
 
 - **Goal.** Both admins confirm, with real scenarios, that the system works for daily operations ([charter][charter] §6, phase 6).
-- **Entry.** M8. The UAT checklist exists in the [test plan][tp]. Both admins have the accounts they will use, created once with the seed script ([architecture][arch] §10.4), with 2FA set up; where UAT runs is [open question](#open-questions) 14. The real content (O-02, O-03) is entered, or the gaps are named on the checklist **[P] (new in this doc)**. The [staff guide][staff] is available **[P] (new in this doc)**.
+- **Entry.** M8. The UAT checklist exists in the [test plan][tp]. UAT runs on the test project **[C]** ([D-28][dl]). Both admins have their accounts there, created with the seed script ([architecture][arch] §10.4), with 2FA set up. The real content (O-02, O-03) is entered, or the gaps are named on the checklist **[P] (new in this doc)**. The [staff guide][staff] is available **[P] (new in this doc)**.
 - **Exit (M9 Accepted).** Both admins accept the checklist. Every defect found is fixed and its scenario run again **[P] (new in this doc)**.
 - **Deliverables.** The accepted checklist; the list of fixes.
 
@@ -172,13 +172,13 @@ The charter's "Build" phase is split here into phases 5 to 9, its "Test" phase i
 - **Goal.** Every condition that the docs set "before launch" is met (section 5).
 - **Entry.** M9. Gate work itself can start much earlier, for example the lawyer review as soon as the batch-1 docs are approved **[P] (new in this doc)**.
 - **Exit (M10 Gates cleared).** Every gate in section 5 is cleared, or a decision in the [decision log][dl] accepts it as a known risk **[P] (new in this doc)**.
-- **Deliverables.** The gate checklist with evidence for each gate.
+- **Deliverables.** The gate checklist with evidence for each gate. Production is created fresh just before launch, with the setup checklist of [deployment and operations][ops] §2, the real content, and the admin accounts, so it holds no test records and acknowledgment numbering starts clean **[C]** ([D-28][dl]); online booking stays closed there until the launch step (G22).
 
 ### 1.13 Launch
 
 - **Goal.** The website opens to customers ([charter][charter] §6, phase 7).
 - **Entry.** M10.
-- **Exit (M11 Live).** The public site is open. The health panel shows every job running, and the first nightly backup after opening exists **[P] (new in this doc)**.
+- **Exit (M11 Live).** The Super Admin turns on `public_booking_open` ([FR-ADM-34][fr]), the last step of gate G22 **[C]** ([D-30][dl]), and the public site is open. The health panel shows every job running, and the first nightly backup after opening exists **[P] (new in this doc)**.
 - **Deliverables.** Final content in the settings and the catalog; the domain and DNS as O-05 decides; the launch steps of [deployment and operations][ops]. From then on the recurring tasks run: the weekly usage check ([NFR-06][nfr]), the monthly offline copy ([NFR-28][nfr]), and patching ([NFR-30][nfr]).
 
 ### 1.14 Post-MVP
@@ -215,7 +215,7 @@ Where one FR is split across features, every part is named. The rules behind eac
 | E2.1 | Schemas, roles, grants, role timeouts, extensions | — ([NFR-10][nfr], [NFR-22][nfr]) | Grants and role timeouts per [data-model][data] §2.2 and §2.3 (the callable functions: [api-specification][api] §1.4, §5; controls: [security][sec] §4.3) | Schemas `app`, `admin_auth`; roles `app_owner`, `app_rw`, `app_backup` ([data-model][data] §2) | E1.1; week-1 item 1 |
 | E2.2 | Enums, every table, production seed rows **[P] (new in this doc)**: the whole table set now, functions per epic | — | — | Every table of [data-model][data] §5: `resources`, `packages`, `addons`, `delivery_slots`, `settings`, `reservations`, `resource_claims`, `reservation_addons`, `blocks`, `payments`, `ack_counters`, `payment_proofs`, `reservation_notes`, `audit_log`, `notifications_outbox`, `submission_keys`, `rate_limits`, `job_runs`, `job_leases`, `retention_runs`, `anonymized_bookings`, `capacity_lock`; seed rows per [data-model][data] §10 | E2.1 |
 | E2.3 | Live-claim guard and capacity lock | — ([NFR-20][nfr]) | `app.take_capacity_lock` | `resource_claims`, `capacity_lock` ([data-model][data] §6) | E2.2; week-1 item 2 |
-| E2.4 | Shared helpers, standard steps, result envelope | [FR-ADM-07][fr] (common rules) | Standard steps A, L, R, X, W ([api-specification][api] §5.1); `app.assert_actor`, `app.manila_today`, `app.normalize_mobile`, `app.normalize_ref_code`, `app.setting`, `app.hold_is_overdue`, `app.effective_status`, `app.refuse`; the envelope and result codes ([api-specification][api] §1.5 to §1.7) | `settings`; view `reservation_effective` | E2.2 |
+| E2.4 | Shared helpers, standard steps, result envelope | [FR-ADM-07][fr] (common rules) | Standard steps A, L, R, X, W ([api-specification][api] §5.1); `app.assert_actor`, `app.now`, `app.manila_today`, `app.normalize_mobile`, `app.normalize_ref_code`, `app.setting`, `app.hold_is_overdue`, `app.effective_status`, `app.refuse`; the envelope and result codes ([api-specification][api] §1.5 to §1.7) | `settings`; view `reservation_effective` | E2.2 |
 | E2.5 | Audit writer | [FR-ADM-32][fr] (writing entries) | `app.write_audit` | `audit_log` | E2.2 |
 | E2.6 | Outbox writer | [FR-NTF-16][fr] (queueing) | `app.enqueue_email` | `notifications_outbox` | E2.2 |
 
@@ -226,7 +226,7 @@ Where one FR is split across features, every part is named. The rules behind eac
 | E3.1 | Login with 2FA | [FR-ADM-01][fr] | Better Auth `/api/auth/[...all]`; hooks `app.login_guard`, `app.login_result`, `app.record_account_event` | Better Auth tables `user`, `session`, `account`, `two_factor`, `verification` ([data-model][data] §5.19); `rate_limits`, `audit_log` | E2; week-1 item 3 |
 | E3.2 | Server-side role checks | [FR-ADM-07][fr] (role check) | `proxy.ts`; `verifySession`, `requireAdmin`, `requireRole` ([api-specification][api] §1.2) | `user`, `session` | E3.1 |
 | E3.3 | First accounts and break-glass scripts | [FR-ADM-30][fr] (scripts) | `scripts/seed-admins.ts`; `scripts/break-glass-reset-2fa.ts` → `app.break_glass_reset_2fa` | Better Auth tables, `audit_log` | E3.1 |
-| E3.4 | Accounts screen (A11) | [FR-ADM-30][fr] | `listAdminAccounts`; `createAdminAccount`, `disableAdminAccount`, `resetAdminAccount`, `signOutAdminAccount` → `app.create_admin_account`, `app.disable_admin`, `app.reset_admin`, `app.sign_out_admin` | Better Auth tables, `audit_log` | E3.2 |
+| E3.4 | Accounts screen (A11), the forced password change, and moving 2FA alone | [FR-ADM-30][fr], [FR-ADM-01][fr] (password change) | `listAdminAccounts`; `createAdminAccount`, `disableAdminAccount`, `reenableAdminAccount`, `resetAdminAccount`, `signOutAdminAccount` → `app.create_admin_account`, `app.disable_admin`, `app.reenable_admin`, `app.reset_admin`, `app.sign_out_admin`; `app.password_changed`; `moveTwoFactor` → `app.record_2fa_moved`. Email queued: `admin_2fa_moved` | Better Auth tables, `audit_log`, `notifications_outbox` | E3.2 |
 
 **E4 · Settings**
 
@@ -234,6 +234,7 @@ Where one FR is split across features, every part is named. The rules behind eac
 |---|---|---|---|---|---|
 | E4.1 | Settings screen (A10) | [FR-ADM-28][fr] | `getSettings`; `updateSetting` → `app.update_setting` | `settings`, `audit_log` | E3.2 |
 | E4.2 | Delivery slots | [FR-ADM-28][fr] (slots) | `createDeliverySlot`, `updateDeliverySlot`, `archiveCatalogItem` (slots) → `app.create_delivery_slot`, `app.update_delivery_slot`, `app.archive_catalog_item` | `delivery_slots`, `audit_log` | E4.1; shape of O-02 |
+| E4.3 | Pre-launch switch | [FR-ADM-34][fr] | `updateSetting` (`public_booking_open`); the `booking_not_open` checks and `noindex` ([api-specification][api] §2.1, §2.3, §2.11) | `settings`, `audit_log` | E4.1 |
 
 ### 2.2 Core booking
 
@@ -347,7 +348,7 @@ Where one FR is split across features, every part is named. The rules behind eac
 
 | # | Feature | FR IDs | Actions, routes, functions | Tables | Depends on |
 |---|---|---|---|---|---|
-| E17.1 | Email provider and one template per email type | [FR-NTF-01][fr], [FR-NTF-02][fr], [FR-NTF-03][fr], [FR-NTF-04][fr], [FR-NTF-05][fr], [FR-NTF-06][fr], [FR-NTF-07][fr], [FR-NTF-08][fr], [FR-NTF-09][fr], [FR-NTF-10][fr], [FR-NTF-11][fr], [FR-NTF-12][fr], [FR-NTF-13][fr], [FR-NTF-14][fr], [FR-NTF-15][fr] | `EmailProvider` (Resend) and templates in `lib/email/` ([architecture][arch] §9); the outbox type of each FR is in [api-specification][api] §7 | `notifications_outbox` | E2.6; the features that queue each type (table below) |
+| E17.1 | Email provider and one template per email type | [FR-NTF-01][fr], [FR-NTF-02][fr], [FR-NTF-03][fr], [FR-NTF-04][fr], [FR-NTF-05][fr], [FR-NTF-06][fr], [FR-NTF-07][fr], [FR-NTF-08][fr], [FR-NTF-09][fr], [FR-NTF-10][fr], [FR-NTF-11][fr], [FR-NTF-12][fr], [FR-NTF-13][fr], [FR-NTF-14][fr], [FR-NTF-15][fr], [FR-NTF-22][fr] | `EmailProvider` (Resend) and templates in `lib/email/` ([architecture][arch] §9); the outbox type of each FR is in [api-specification][api] §7 | `notifications_outbox` | E2.6; the features that queue each type (table below) |
 | E17.2 | Sending after the reply and on the tick | [FR-NTF-16][fr] (sending), [FR-SYS-03][fr], [FR-SYS-09][fr] | The `after()` sender ([api-specification][api] §1.12); `ksb_request_tick` → `app.request_tick` → `POST /api/jobs/tick`; `app.try_start_job`, `app.finish_job`, `app.claim_due_emails`, `app.record_email_result` | `notifications_outbox`, `job_runs`, `job_leases` | E17.1; week-1 item 4 |
 | E17.3 | No duplicates, retries, stale skips, caps | [FR-NTF-17][fr], [FR-NTF-18][fr], [FR-NTF-19][fr], [FR-NTF-20][fr] | Outbox unique key with `ON CONFLICT DO NOTHING`; the Resend idempotency key; `app.claim_due_emails`, `app.record_email_result` | `notifications_outbox`, `settings` | E17.2 |
 | E17.4 | Customers without email: the prepared message | [FR-NTF-21][fr] | `app.enqueue_email` skips an empty recipient; the prepared message in `getReservation` | `notifications_outbox`, `reservations` | E17.1, E10.3 |
@@ -371,6 +372,7 @@ Which feature queues each email type, so E17.1 can be tested against real rows:
 | [FR-NTF-13][fr] | `admin_new_request` | E7.2 |
 | [FR-NTF-14][fr] | `admin_proof_uploaded` | E12.2 |
 | [FR-NTF-15][fr] | `admin_online_paused` | E7.2 |
+| [FR-NTF-22][fr] | `admin_2fa_moved` | E3.4 |
 
 **E18 · Scheduled jobs**
 
@@ -443,11 +445,11 @@ Every FR in [functional-requirements][fr] §1 has MVP flag **Yes**. Each one is 
 | Group | FR → feature |
 |---|---|
 | Public website | FR-PUB-01 → E9.1 · FR-PUB-02 → E5.3 · FR-PUB-03 → E6.2 · FR-PUB-04 → E7.1 · FR-PUB-05 → E7.1 · FR-PUB-06 → E7.2 · FR-PUB-07 → E7.3 · FR-PUB-08 → E7.3 · FR-PUB-09 → E8.1 · FR-PUB-10 → E8.2 · FR-PUB-11 → E8.3 · FR-PUB-12 → E12.2 · FR-PUB-13 → E8.4 · FR-PUB-14 → E12.4 · FR-PUB-15 → E9.2 · FR-PUB-16 → E9.3 |
-| Admin panel | FR-ADM-01 → E3.1 · FR-ADM-02 → E10.1 · FR-ADM-03 → E10.2 · FR-ADM-04 → E10.3 · FR-ADM-05 → E10.3 · FR-ADM-06 → E10.4 · FR-ADM-07 → E2.4, E3.2 · FR-ADM-08 → E11.1 · FR-ADM-09 → E11.2 · FR-ADM-10 → E14.1 · FR-ADM-11 → E12.1 · FR-ADM-12 → E12.3 · FR-ADM-13 → E11.3 · FR-ADM-14 → E15.1 · FR-ADM-15 → E15.2 · FR-ADM-16 → E14.2 · FR-ADM-17 → E14.3 · FR-ADM-18 → E15.3 · FR-ADM-19 → E15.4 · FR-ADM-20 → E16.2 · FR-ADM-21 → E14.4 · FR-ADM-22 → E10.6 · FR-ADM-23 → E12.4 · FR-ADM-24 → E13.1 · FR-ADM-25 → E6.3 · FR-ADM-26 → E5.1 · FR-ADM-27 → E5.2 · FR-ADM-28 → E4.1, E4.2 · FR-ADM-29 → E10.1 · FR-ADM-30 → E3.3, E3.4 · FR-ADM-31 → E19.2, E19.3 · FR-ADM-32 → E2.5, E10.3, E10.5 · FR-ADM-33 → E20.2 |
-| Notifications | FR-NTF-01 to FR-NTF-15 → E17.1 (each queued as in the table under E17) · FR-NTF-04 → also E18.2 · FR-NTF-16 → E2.6, E17.2 · FR-NTF-17 → E17.3 · FR-NTF-18 → E17.3 · FR-NTF-19 → E17.3 · FR-NTF-20 → E17.3 · FR-NTF-21 → E17.4 |
+| Admin panel | FR-ADM-01 → E3.1 · FR-ADM-02 → E10.1 · FR-ADM-03 → E10.2 · FR-ADM-04 → E10.3 · FR-ADM-05 → E10.3 · FR-ADM-06 → E10.4 · FR-ADM-07 → E2.4, E3.2 · FR-ADM-08 → E11.1 · FR-ADM-09 → E11.2 · FR-ADM-10 → E14.1 · FR-ADM-11 → E12.1 · FR-ADM-12 → E12.3 · FR-ADM-13 → E11.3 · FR-ADM-14 → E15.1 · FR-ADM-15 → E15.2 · FR-ADM-16 → E14.2 · FR-ADM-17 → E14.3 · FR-ADM-18 → E15.3 · FR-ADM-19 → E15.4 · FR-ADM-20 → E16.2 · FR-ADM-21 → E14.4 · FR-ADM-22 → E10.6 · FR-ADM-23 → E12.4 · FR-ADM-24 → E13.1 · FR-ADM-25 → E6.3 · FR-ADM-26 → E5.1 · FR-ADM-27 → E5.2 · FR-ADM-28 → E4.1, E4.2 · FR-ADM-29 → E10.1 · FR-ADM-30 → E3.3, E3.4 · FR-ADM-31 → E19.2, E19.3 · FR-ADM-32 → E2.5, E10.3, E10.5 · FR-ADM-33 → E20.2 · FR-ADM-34 → E4.3 |
+| Notifications | FR-NTF-01 to FR-NTF-15 and FR-NTF-22 → E17.1 (each queued as in the table under E17) · FR-NTF-04 → also E18.2 · FR-NTF-16 → E2.6, E17.2 · FR-NTF-17 → E17.3 · FR-NTF-18 → E17.3 · FR-NTF-19 → E17.3 · FR-NTF-20 → E17.3 · FR-NTF-21 → E17.4 |
 | Scheduled jobs and system | FR-SYS-01 → E18.1 · FR-SYS-02 → E18.2 · FR-SYS-03 → E17.2 · FR-SYS-04 → E16.1 · FR-SYS-05 → E19.1 · FR-SYS-06 → E18.3 · FR-SYS-07 → E1.5 · FR-SYS-08 → E18.4 · FR-SYS-09 → E17.2 (and the daily route in E18.4) · FR-SYS-10 → E18.5 · FR-SYS-11 → E1.4 · FR-SYS-12 → E20.1 |
 
-**MVP FRs not placed in the backlog:** none. (82 MVP FRs: 16 FR-PUB, 33 FR-ADM, 21 FR-NTF, 12 FR-SYS.)
+**MVP FRs not placed in the backlog:** none. (84 MVP FRs: 16 FR-PUB, 34 FR-ADM, 22 FR-NTF, 12 FR-SYS.)
 
 ---
 
@@ -565,6 +567,7 @@ Every gate must be cleared before M10 (section 1.12). This section owns the list
 | G19 | **First offline backup copy** | The first monthly offline copy of [NFR-28][nfr] and the stored key copy of [deployment and operations][ops] §5.2 exist | [NFR-28][nfr]; **[P]** there | 16 |
 | G20 | **Runbooks ready** | Deploy, backup and restore, the Vercel exit, and the incident and breach runbooks exist in [deployment and operations][ops] | [NFR-05][nfr]; [privacy-and-retention][priv] §5.7, §9. **[P] (new in this doc)** as a gate | — |
 | G21 | **Staff guide handed over** | The Admin has the [staff guide][staff] | **[P]** there | 17 |
+| G22 | **Fresh production and the booking switch** | Production was created fresh just before launch, so it holds no test records and its acknowledgment counter is unused ([D-28][dl]); `public_booking_open` is off there, and the "Opening soon" pages and `noindex` are checked. Its last step, at launch, is turning the switch on (section 1.13) | **[C]** [D-28][dl], [D-30][dl]; [FR-ADM-34][fr] | 18 |
 
 ---
 
@@ -636,26 +639,26 @@ These are not decided here. If the reviewers agree that an answer is needed, rec
 
 **Proposals in this document to confirm** (each **[P] (new in this doc)**):
 
-1. **Recording the go / no-go.** Where is the week-1 result recorded? Proposal: a new decision in the [decision log][dl] (D-25 or the next free number), listing each item's result and any fix.
-2. **The spike's code.** Is the week-1 spike code thrown away, or does it become the start of Foundation?
-3. **The whole table set in Foundation** (E2.2), with functions added epic by epic, instead of adding tables per epic.
-4. **Keep-alive in Foundation** (E1.5) rather than with the other daily jobs, so the free Supabase project is not paused during the build ([NFR-07][nfr]).
+1. **Recording the go / no-go.** Resolved ([D-31][dl]): a new decision in the [decision log][dl], with the next free D number at that time, listing each item's result and its fix; the NFR-03 speed target is set then.
+2. **The spike's code.** Resolved ([D-32][dl]): the week-1 spike code is thrown away; Foundation is built properly, test-first.
+3. **The whole table set in Foundation** (E2.2), with functions added epic by epic, instead of adding tables per epic. Accepted ([D-38][dl]).
+4. **Keep-alive in Foundation** (E1.5) rather than with the other daily jobs, so the free Supabase project is not paused during the build ([NFR-07][nfr]). Accepted ([D-38][dl]).
 5. **Emails only queued until phase 9.** The phase order sends no email before Notifications and jobs. Is a working sender wanted earlier, for example for the Admin's phase-end look at the screens?
 6. **Phase-end demos to the Admin** (section 4, "Review"; section 6).
 7. **The extra gates** G6, G7, G8, G12, G17, G18, and G20, which no owning doc yet sets as "before launch". G2, G14, G16, and G20 have no row in [deployment and operations][ops] §10 yet; if they are accepted, that checklist needs rows for them.
 8. **The docs exit criterion** that every doc's open questions are answered or moved to the decision log before M1.
 9. **The staff guide as an entry criterion for UAT,** and the real content (O-02, O-03) entered before UAT.
-10. **One implementation plan per phase** (section 9).
+10. **One implementation plan per phase** (section 9). Accepted ([D-38][dl]).
 11. **The local IDs** E1 to E20 and M1 to M11.
 
 **New questions found while writing this document:**
 
 12. **Do O-10 and O-11 hold launch?** [Privacy-and-retention][priv] §9 sets "No date set" for both, and D-21 accepts the acknowledgment-name risk knowingly. Must launch wait for the lawyer's and the CPA's advice, or only for O-08?
 13. **Who arranges and pays for the lawyer and CPA reviews, and when?** The [charter][charter] §3 names them as stakeholders, and the ₱0 rule covers running cost only (NFR-01); no doc says who engages them.
-14. **Where UAT runs.** On the production project before it opens, or on a separate project ([architecture][arch] open question 9)? Business records can never be deleted ([NFR-22][nfr]), so test bookings in production would stay. The options are set out in [deployment and operations][ops] open question 46; the answer also decides when the production admin accounts are created (section 1.11).
-15. **Production before launch.** Merges to `main` deploy production from Foundation on ([architecture][arch] §11), and Standard Protection leaves production public ([architecture][arch] §2.2). How is the production site kept from taking real bookings before launch?
+14. **Where UAT runs.** Resolved ([D-28][dl]): the week-1 test and UAT run on a separate test project, which is also the staging environment during the build; production is created fresh just before launch, with its admin accounts (sections 1.11 and 1.12), so it holds no test records.
+15. **Production before launch.** Resolved ([D-30][dl]): a Super-Admin-only setting, `public_booking_open`, false by default, keeps online booking closed, shows "Opening soon", and sends `noindex` on every page until it is turned on at launch (gate G22; [FR-ADM-34][fr]).
 16. **The charter's line on dates.** Resolved (reconciled 2026-10-21): [charter][charter] §6 now says that the roadmap holds the phase order, the milestones, and the gates, with no calendar dates.
-17. **Name mismatches to settle before Foundation's migrations.** Resolved (reconciled 2026-10-21) by the owning documents: the reservations view is `app.reservation_effective` ([data-model][data] §5.20); settings are checked by `app.setting_value_is_valid` ([data-model][data] §5.2); the `job_name` values are the `pg_cron` job names of [api-specification][api] §6 plus `tick` and `daily`, and the `job_result` values are `ok`, `error`, and `skipped` ([data-model][data] §3); the route lease is the `job_leases` row ([data-model][data] §5.15), used by [api-specification][api] §4 and [architecture][arch] §7.2; `job_runs` is kept 30 days; the `app_rw` timeouts are 5 s, 2 s, and 10 s ([data-model][data] §2.3). Still open: the signature of `app.hold_is_overdue` ([api-specification][api] open question 29).
+17. **Name mismatches to settle before Foundation's migrations.** Resolved (reconciled 2026-10-21) by the owning documents: the reservations view is `app.reservation_effective` ([data-model][data] §5.20); settings are checked by `app.setting_value_is_valid` ([data-model][data] §5.2); the `job_name` values are the `pg_cron` job names of [api-specification][api] §6 plus `tick` and `daily`, and the `job_result` values are `ok`, `error`, and `skipped` ([data-model][data] §3); the route lease is the `job_leases` row ([data-model][data] §5.15), used by [api-specification][api] §4 and [architecture][arch] §7.2; `job_runs` is kept 30 days; the `app_rw` timeouts are 5 s, 2 s, and 10 s ([data-model][data] §2.3). The signature of `app.hold_is_overdue` is resolved too ([D-25][dl]): `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)`, `IMMUTABLE` ([api-specification][api] open question 29).
 18. **Content timing for O-02.** If the per-weekday question for on-site hours is not answered by Core booking, is a single opening and closing time built first ([data-model][data] open question 14), with a later migration if needed?
 
 Already open elsewhere and not repeated here: every question in the "Open questions" sections of the docs named under "Depends on". Several of them must be answered before a feature can be finished; the feature's tests then follow the answer ([api-specification][api] lists its provisional defaults).

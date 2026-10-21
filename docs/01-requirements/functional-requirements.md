@@ -94,6 +94,7 @@ Every requirement in this document is part of the MVP (the first release). Items
 | FR-ADM-31 | Legal hold and erasure requests | Yes | [P] |
 | FR-ADM-32 | Audit log and reservation history | Yes | MVP scope |
 | FR-ADM-33 | Health panel | Yes | MVP scope |
+| FR-ADM-34 | Pre-launch switch: open online booking | Yes | [C] (D-30) |
 | **Notifications** | | | |
 | FR-NTF-01 to FR-NTF-12 | Customer emails (one ID per email type) | Yes | [C]; three types [P] |
 | FR-NTF-13 to FR-NTF-15 | Admin emails (one ID per email type) | Yes | [C]; two types [P] |
@@ -103,6 +104,7 @@ Every requirement in this document is part of the MVP (the first release). Items
 | FR-NTF-19 | Stale emails are skipped | Yes | [P] |
 | FR-NTF-20 | Email caps and priority | Yes | [P]; default caps [U] |
 | FR-NTF-21 | Customers without email | Yes | MVP scope |
+| FR-NTF-22 | Admin email: 2FA moved to a new phone | Yes | [C] (D-36) |
 | **Scheduled jobs and system** | | | |
 | FR-SYS-01 | Expire overdue holds (every minute) | Yes | MVP scope |
 | FR-SYS-02 | Queue due deposit reminders (every minute) | Yes | [C] |
@@ -197,8 +199,8 @@ The customer enters their contact details and, for delivery, the venue.
   - **email address**, optional **[C]** (D-08);
   - **for delivery, the venue:** barangay and city or municipality (required), plus street and landmarks;
   - **"Additional requirements"**, an optional note of up to 500 characters.
-- The mobile number is accepted only in the formats listed in BR-11, and is saved in one standard form.
-  - *Example.* Ana types `0917 123 4567`. It is accepted and saved as `+639171234567`. `12345` is refused with a clear message.
+- Every valid Philippine mobile number is accepted in the forms listed in BR-11, and is saved in one standard form **[C]** (D-34).
+  - *Example.* Ana types `0917 123 4567`. It is accepted and saved as `+639171234567`. A valid number that starts with 08…, such as `0895 123 4567`, is accepted too. `12345` is refused with a clear message.
 - The "Additional requirements" box shows this warning: *do not enter IDs, birthdates, health, or religious information*. A note longer than 500 characters cannot be entered.
 - The form asks for no other personal data ([privacy-and-retention](privacy-and-retention.md)).
 - If no email address is given, the booking still works. The customer then follows it on the status page (FR-NTF-21).
@@ -383,6 +385,7 @@ The admin panel is the private part of the website, at `/admin`. Only the two ad
 - There is no public sign-up and no "create account" link.
 - Repeated failed logins lock the account for a while (limits: [non-functional-requirements](non-functional-requirements.md) NFR-11).
 - Given a visitor who is not logged in, when they open any `/admin` address, then they are sent to the login page.
+- A new or reset password must be changed at the next login, before the admin area opens **[C]** (D-36).
 - An admin can log out.
 - Account changes are recorded in the audit log, in the "account" category (FR-ADM-32). Logins are recorded in the "security" category **[P] (new in this doc)**.
 - *For the developer:* Better Auth with the admin plugin and TOTP; passwords hashed with argon2id. The middleware (`proxy.ts`) only redirects; the real check of login and role runs on the server in every admin page, action, and route ([roles-and-permissions](roles-and-permissions.md) section 7).
@@ -744,6 +747,7 @@ Settings are values that can be changed without changing the code.
 | Security **[P]** | Rate-limit thresholds | [non-functional-requirements](non-functional-requirements.md) NFR-11 |
 | Privacy **[P]** | Retention periods | [privacy-and-retention](privacy-and-retention.md) |
 | Payments **[P]** | Acknowledgment issuer name; deposit instructions (e-wallet name, number, and account name; office address and hours); deposit terms text | [catalog-and-payments](../02-domain/catalog-and-payments.md), [privacy-and-retention](privacy-and-retention.md) (issuer name) |
+| Launch **[C]** (D-30) | Online booking open (the pre-launch switch) | FR-ADM-34 |
 
 - The online-booking pause (`online_paused_until`) is not edited by hand. Only the breaker sets it, and only "resume early" clears it (FR-ADM-29).
 - Only the roles allowed in [roles-and-permissions](roles-and-permissions.md) section 2.6 can save each setting. Others are refused by the server.
@@ -767,8 +771,10 @@ Settings are values that can be changed without changing the code.
 **MVP:** Yes · **Label:** [C] (D-07); account rules [P] · **Relies on:** [roles-and-permissions](roles-and-permissions.md) section 5 (account rules)
 
 **Acceptance criteria**
-- The Super Admin has an accounts screen to create, disable, reset, and sign out admin accounts. The rules (for example, at most one active Admin, and the Super Admin cannot disable itself) are defined only in [roles-and-permissions](roles-and-permissions.md) section 5.
-- A reset sets a new password, forces 2FA to be set up again, and ends all of that person's sessions.
+- The Super Admin has an accounts screen to create, disable, re-enable, reset, and sign out admin accounts **[C]** (re-enable: D-37). The rules (for example, at most one active Admin, and the Super Admin cannot disable itself) are defined only in [roles-and-permissions](roles-and-permissions.md) section 5. There is no "change role" action **[C]** (D-37).
+- A reset sets a new password, forces 2FA to be set up again, and ends all of that person's sessions. The new password must be changed at the next login (FR-ADM-01).
+- A disabled account's login details are deleted by the retention job when the period in [privacy-and-retention](privacy-and-retention.md) ends (30 days after the disable); the account itself is kept, with only the name **[C]** (D-37; FR-SYS-05).
+- After logging in with a backup code, an admin can move 2FA to a new phone alone, with the password and a backup code. This is recorded in the "security" category, and the Super Admin gets an email (FR-NTF-22), unless he moved his own **[C]** (D-36).
 - Every account action is recorded in the audit log, in the "account" category.
 - The break-glass script for a lost Super Admin 2FA device is a script, not a screen ([roles-and-permissions](roles-and-permissions.md) section 5.2).
 
@@ -813,6 +819,22 @@ The health panel shows whether the system is working.
   - email cap usage today and this month, with a warning when emails are held until the next day (FR-NTF-20);
   - storage use.
 - *Example.* If the every-minute job stopped 20 minutes ago, the panel shows its last run as 20 minutes ago.
+
+### FR-ADM-34 · Pre-launch switch: open online booking
+
+**MVP:** Yes · **Label:** [C] (D-30) · **Relies on:** [roles-and-permissions](roles-and-permissions.md) section 2.6 (Super Admin only); FR-ADM-28
+
+Before the official opening, the website is public but must not take bookings or show in search results.
+
+**Acceptance criteria**
+- A setting, "online booking open" (`public_booking_open`), is false by default. Only the Super Admin can change it; anyone else is refused by the server.
+- While it is false:
+  - online booking is off: a submitted request is refused, and the calendar and the form show "Opening soon" instead of dates (FR-PUB-03, FR-PUB-06);
+  - the public pages show "Opening soon" in place of the booking links (FR-PUB-01);
+  - every page tells search engines not to list it (`noindex`).
+- Bookings that staff enter for phone, walk-in, and Facebook customers (FR-ADM-24) are not affected.
+- Turning it on is a step of the launch gate ([roadmap](../06-delivery/roadmap.md) §5). Each change is recorded in the audit log, in the "settings" category (FR-ADM-28).
+- *Example.* During the build, a customer finds the test website and opens the calendar. It says "Opening soon", and the form cannot be sent.
 
 ---
 
@@ -860,7 +882,7 @@ Spec v0.2 labels the customer emails **[C]**, and the extra types **[P]**. In th
 - If the deadline is extended, the reminder follows the new deadline (FR-NTF-17).
 - If the booking is already Confirmed, Cancelled, or Expired at send time, the reminder is skipped (FR-NTF-19).
 
-### 4.2 Admin emails (FR-NTF-13 to FR-NTF-15)
+### 4.2 Admin emails (FR-NTF-13 to FR-NTF-15, FR-NTF-22)
 
 In the "Must contain" column, *italic text* is **[P] (new in this doc)**.
 
@@ -869,12 +891,13 @@ In the "Must contain" column, *italic text* is **[P] (new in this doc)**.
 | FR-NTF-13 | New online request | A customer submits a request on the website (FR-PUB-06). Not sent for staff-created bookings (BR-06a). | *The reference code and booking summary;* urgent requests clearly marked | [C] (D-10) |
 | FR-NTF-14 | Proof uploaded | A customer uploads a proof (FR-PUB-12) | *The reference code and the deadline that is paused* | [P] |
 | FR-NTF-15 | Online booking paused | The breaker pauses online booking (BR-07a) | *When the pause ends, and that either admin can resume early* | [P] |
+| FR-NTF-22 | 2FA moved to a new phone | The Admin moves 2FA to a new phone after a backup-code login (FR-ADM-30). Sent to the Super Admin only; not sent when the Super Admin moves his own | Which account, and when; that the Super Admin should sign out and reset that account if it was not expected | [C] (D-36) |
 
 **MVP:** Yes, for every row. **Relies on:** [business-rules](business-rules.md) BR-06a, BR-07a, BR-12; FR-ADM-02.
 
 **Acceptance criteria**
-- Each admin email goes to both admins.
-- Each one also appears on the dashboard (FR-ADM-02).
+- Each admin email goes to both admins, except FR-NTF-22, which goes to the Super Admin only.
+- Each one also appears on the dashboard (FR-ADM-02), except FR-NTF-22, which is in the audit log (FR-ADM-32).
 - The breaker sends exactly one email per pause (BR-07a).
 
 ### 4.3 How emails are sent (FR-NTF-16 to FR-NTF-20)
@@ -960,7 +983,7 @@ The free email plan limits how many emails can be sent.
 | Daily | Backup sweep: `/api/jobs/daily` | Vercel Cron | FR-SYS-08 |
 | Nightly | Encrypted database backup | GitHub Actions (private repository) | FR-SYS-12 |
 
-*For the developer:* the daily jobs run from 00:15 Manila time (`15 16 * * *` in UTC), a few minutes apart, as [api-specification](../05-technical/api-specification.md) §6 sets, and work out "today" with `app.manila_today()` (Manila date from `clock_timestamp()`; see [data-model](../05-technical/data-model.md)), following spec v0.2 §12. The monthly offline backup copy is a task for a person, not a job ([non-functional-requirements](non-functional-requirements.md) NFR-28).
+*For the developer:* the daily jobs run from 00:15 Manila time (`15 16 * * *` in UTC), a few minutes apart, as [api-specification](../05-technical/api-specification.md) §6 sets, and work out "today" with `app.manila_today()` (the Manila date from `app.now()`, which returns `clock_timestamp()` outside tests, **[C]** D-29; see [data-model](../05-technical/data-model.md)), following spec v0.2 §12. The monthly offline backup copy is a task for a person, not a job ([non-functional-requirements](non-functional-requirements.md) NFR-28).
 
 ### FR-SYS-01 · Expire overdue holds (every minute)
 
@@ -1005,7 +1028,7 @@ The free email plan limits how many emails can be sent.
 **MVP:** Yes · **Label:** Retention defaults [C] (D-21) · **Relies on:** [privacy-and-retention](privacy-and-retention.md) (retention schedule, closure date, ledger end, legal hold: main rules)
 
 **Acceptance criteria**
-- Every day, the job applies the retention schedule in [privacy-and-retention](privacy-and-retention.md): it blanks, reduces, or deletes each kind of data when its period ends. This includes payment-proof images, duplicate-submission keys, and rate-limit counters.
+- Every day, the job applies the retention schedule in [privacy-and-retention](privacy-and-retention.md): it blanks, reduces, or deletes each kind of data when its period ends. This includes payment-proof images, duplicate-submission keys, rate-limit counters, and a disabled admin's login details (password hash, 2FA secrets, backup codes, sessions), while the account itself is kept with only the name **[C]** (D-37).
 - It skips every reservation under legal hold (FR-ADM-31).
 - It writes a run log with counts only, never personal data.
 - The developer can also start it by hand. After any restore from a backup, it runs before the system reopens (spec v0.2 §15).
@@ -1112,7 +1135,7 @@ Spec v0.2 does not answer these. They are not decided here. If the reviewers agr
 ## 8. Changing a requirement
 
 - **A change to a decision** (for example, adding SMS) starts in the [decision log](../00-project/decision-log.md): update the log first, then this document and every other document the decision lists under "Docs affected".
-- **A new requirement** gets the next free number in its group, for example FR-ADM-34. Numbers are never reused or renumbered.
+- **A new requirement** gets the next free number in its group, for example FR-ADM-35. Numbers are never reused or renumbered.
 - **A dropped requirement** stays in this document, marked "Withdrawn", with the date and the decision ID.
 - **A detail marked "[P] (new in this doc)"** becomes plain text once the review confirms it, or is corrected.
 - **The frozen spec is never edited** (D-23).

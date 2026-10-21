@@ -10,7 +10,7 @@
 
 *For the business owner (Admin).*
 
-The design of the reservation system is approved, and all 27 project documents are written and checked against each other. Nothing has been built yet. The next step is for you and the developer to read the documents and answer the open questions in section 3: 52 business questions for you, 6 items of content to provide, and 21 legal and privacy questions, several of them for a lawyer and a CPA. After that, the developer runs a one-week technical test on the real free services (the "week-1 test"), and Claude writes the step-by-step build plan. Building then happens in five phases, followed by testing together and a short list of checks before the website opens. One technical problem must be fixed first: GitHub refuses to let Claude save its work (error 403).
+The design of the reservation system is approved, and all 27 project documents are written and checked against each other. Nothing has been built yet. The developer has answered the 14 urgent technical questions (section 3.1); his answers are recorded as decisions D-25 to D-38, and the documents are updated to match. The next step is for you and the developer to read the documents and answer the remaining open questions in section 3: 52 business questions for you, 6 items of content to provide, and 21 legal and privacy questions, several of them for a lawyer and a CPA. After that, the developer runs a one-week technical test on the real free services (the "week-1 test"), and Claude writes the step-by-step build plan. Building then happens in five phases, followed by testing together and a short list of checks before the website opens. One technical problem must be fixed first: GitHub refuses to let Claude save its work (error 403).
 
 ## How to read this document
 
@@ -38,9 +38,11 @@ The design of the reservation system is approved, and all 27 project documents a
 - **Batch 1 (project, requirements, domain):** 11 docs, including the [decision log][dl] D-01 to D-24: [project charter][charter], [glossary][gl], [decision log][dl], [roles and permissions][roles], [business rules][br], [functional requirements][fr], [non-functional requirements][nfr], [edge cases][ec], [privacy and retention][priv], [reservation lifecycle][lc], [catalog and payments][cat].
 - **Batch 2 (workflows WF-01 to WF-10):** 6 docs plus the one-page [process overview][wf]: [booking and submission][book], [availability and conflicts][avail], [lookup and review][review], [changes and expiry][change], [notifications and tracking][notify], [administration][admin].
 - **Batch 3 (design and technical):** [UX and sitemap][ux], [architecture][arch], [data model][data], [API specification][api], [security][sec].
-- **Batch 4 (delivery and operations):** [roadmap][rm], [test plan][tp] (262 test cases), [deployment and operations][ops], [staff guide][staff] (27 procedures).
+- **Batch 4 (delivery and operations):** [roadmap][rm], [test plan][tp] (270 test cases), [deployment and operations][ops], [staff guide][staff] (27 procedures).
 
 **Consistency.** Cross-doc review and fix passes after each batch, plus a reconciliation pass that aligned the technical docs.
+
+**The developer's answers to Q-001 to Q-014** (2026-10-21), recorded as decisions D-25 to D-38 in the [decision log][dl], with every affected doc updated (section 3.1).
 
 **Quality checks.** Every Mermaid diagram renders, every relative link resolves, and every MVP requirement is placed in the roadmap and covered by a test.
 
@@ -54,14 +56,14 @@ The design of the reservation system is approved, and all 27 project documents a
 |---|---|
 | Project documents drafted | **27** (batch 1: 11 · batch 2: 7 · batch 3: 5 · batch 4: 4), about 23,700 lines, plus the [docs index][readme], this page, the frozen [spec][spec], and the superseded [discovery brief][brief] |
 | Mermaid diagrams | **136** in the 27 documents (141 counting the spec and the brief) |
-| Decisions | **24** (D-01 to D-24) |
+| Decisions | **38** (D-01 to D-38; D-25 to D-38 are the answers to Q-001 to Q-014) |
 | Open items in the decision log | **10** (O-02 to O-11); O-01 is resolved (D-17) |
-| Test cases | **262** (233 automated and manual cases plus 29 acceptance cases, TC-UAT) |
+| Test cases | **270** (241 automated and manual cases plus 29 acceptance cases, TC-UAT); 8 added for D-30, D-35, D-36, and D-37 |
 | Staff guide procedures | **27** (P-01 to P-27) |
-| Numbered items in the docs' open-question sections | **334** in 20 documents. **26** are resolved (22 marked "Resolved" in their own doc, 4 marked resolved in a later doc). The other **308** are either questions, merged here into **144** entries (Q-001 to Q-144), or [P] proposals, summarized in section 3.5.1 |
-| [P] labels to review | **528** "[P] (new in this doc)" and "[P] (reconciled 2026-10-21)" labels in 18 documents (47 of them reconciled; the non-functional requirements write "[P] (new)"), counted as label occurrences |
-| [U] facts to verify | **58** (section 4) |
-| Pre-launch gates | **21** (G1 to G21, section 5) |
+| Numbered items in the docs' open-question sections | Counted before D-25 to D-38, which answer or accept many of them (section 3.1): **334** in 20 documents. **26** are resolved (22 marked "Resolved" in their own doc, 4 marked resolved in a later doc). The other **308** are either questions, merged here into **144** entries (Q-001 to Q-144), or [P] proposals, summarized in section 3.5.1 |
+| [P] labels to review | **528** "[P] (new in this doc)" and "[P] (reconciled 2026-10-21)" labels in 18 documents (47 of them reconciled; the non-functional requirements write "[P] (new)"), counted as label occurrences before D-38, which accepts the Foundation ones as a baseline |
+| [U] facts to verify | **58** (section 4); one of them, row 54, is no longer needed after D-34 |
+| Pre-launch gates | **22** (G1 to G22, section 5); G22 added by D-28 and D-30 |
 
 ---
 
@@ -75,10 +77,10 @@ Who does what next. "Blocks" names the roadmap phase, milestone, or gate that ca
 |---|---|---|---|
 | D-1 | **Fix GitHub access so Claude's pushes work (O-07).** Saving to the repository is currently refused with error 403. Once fixed, the branch `claude/festive-hopper-81qsq5` is pushed. | Gate G2; the week-1 spike's entry criteria **[P]** and Foundation's entry (M3) | [decision log O-07][dl-3]; [roadmap §1.4, §1.5][rm-1] |
 | D-2 | **Make the GitHub repository private (O-06)** **[C]** (D-22). It must be private before the nightly backup is added. | Gate G1; the nightly backup (E20.1, Notifications and jobs, M7); week-1 item 7 if it uses GitHub Actions | [decision log O-06][dl-3]; [NFR-27][nfr] |
-| D-3 | **Review every doc and answer the questions in section 3.** Confirm or correct each [P] proposal (section 3.5), answer sections 3.1 and 3.5, and go through sections 3.2 to 3.4 with the Admin. Record each answer as section 6 says. | M1 (Documentation) | [roadmap §1.3][rm-1] |
-| D-4 | **Run the week-1 test.** Create the Vercel Hobby project (`sin1`) and the Supabase Free project (Singapore), run the checklist in [test plan §4][tp-4], and record the go / no-go (Q-007). | M2; gate G9 | [roadmap §1.4][rm-1]; [architecture §14.1][arch-141] |
+| D-3 | **Review every doc and answer the questions in section 3.** Confirm or correct each [P] proposal (section 3.5), answer sections 3.1 and 3.5, and go through sections 3.2 to 3.4 with the Admin. Record each answer as section 6 says. **Progress (2026-10-21):** section 3.1 is answered (Q-001 to Q-014, now D-25 to D-38), and D-38 accepts the [P] proposals Foundation builds on; sections 3.2 to 3.5 remain. | M1 (Documentation) | [roadmap §1.3][rm-1] |
+| D-4 | **Run the week-1 test.** Create the separate test project, Vercel Hobby (`sin1`) and Supabase Free (Singapore) (D-28), run the checklist in [test plan §4][tp-4], and record the go / no-go as a new decision, which also sets the speed target (D-31). The probe code is thrown away afterwards (D-32). | M2; gate G9 | [roadmap §1.4][rm-1]; [architecture §14.1][arch-141] |
 | D-5 | **Then the implementation plan.** Review and approve the plan Claude writes, then build with Claude phase by phase. | M3 to M8 | [roadmap §9][rm-9] |
-| D-6 | **Pre-launch gates owned by the Super Admin:** G3 (vendor terms), G5, G9, G10, G13, G15, G18, G19 (section 5). | M10 | [roadmap §5][rm-5]; [ops §10][ops-10] |
+| D-6 | **Pre-launch gates owned by the Super Admin:** G3 (vendor terms), G5, G9, G10, G13, G15, G18, G19, and G22: create production fresh, then open online booking at launch (D-28, D-30) (section 5). | M10, M11 | [roadmap §5][rm-5]; [ops §10][ops-10] |
 
 ### Business owner (Admin)
 
@@ -108,7 +110,7 @@ Who does what next. "Blocks" names the roadmap phase, milestone, or gate that ca
 
 | # | Task | Blocks | Source |
 |---|---|---|---|
-| C-1 | **Record each answer** as a new decision (D-25 onwards), update the docs it affects, and mark the question answered here (section 6). | M1 | [decision log §4][dl-4] |
+| C-1 | **Record each answer** as a new decision (D-25 onwards), update the docs it affects, and mark the question answered here (section 6). **Done for Q-001 to Q-014 (2026-10-21):** D-25 to D-38; the next free number is D-39. | M1 | [decision log §4][dl-4] |
 | C-2 | **Write the implementation plan** with the writing-plans process: one plan per phase, starting with the week-1 spike **[P]**, each written when the previous phase reaches its milestone. | M2 and M3 | [roadmap §9][rm-9] |
 | C-3 | **Build phase by phase,** test-first: Foundation, Core booking, Admin review, Changes and money, Notifications and jobs, Hardening. Update the roadmap's phase status at each milestone. | M3 to M8 | [roadmap §1][rm-1] |
 | C-4 | **Push the branch** `claude/festive-hopper-81qsq5` once O-07 is fixed. | Gate G2 | [decision log O-07][dl-3] |
@@ -122,9 +124,10 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 
 ### 3.1 Must answer before the week-1 test / Foundation phase
 
-*Mainly for the developer. Each entry starts with a one-line plain explanation.*
+*Mainly for the developer. Each entry starts with a one-line plain explanation.* **All 14 were answered by the developer on 2026-10-21** and recorded as D-25 to D-38 in the [decision log][dl]; the entries stay, so their IDs are never reused.
 
 #### Q-001 · Which form does the shared "is this hold overdue?" check take?
+- **Answered — D-25** (2026-10-21): `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)`, `IMMUTABLE`, with the time as an argument (the data-model and test-plan form); a paused hold counts as overdue from its service start.
 - **In plain words:** one small database helper decides whether a request's deadline has passed. Two docs describe it differently, and the first build phase needs one version.
 - **Detail:** [API §5.1][api-51] gives `app.hold_is_overdue(reservation)`, which reads the time itself. [Data model §5.20][data-520] and [test plan §1.5][tp-15] give `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)` as an `IMMUTABLE` function with the time as an argument (data model §8 explains why). The same helper also carries [availability OQ 3][avail-q] **[P]**: a paused hold counts as overdue from its service start.
 - **Why it matters:** every capacity function, every reader, and the expiry job share this one predicate, so the calendar and the Submit check never disagree.
@@ -133,6 +136,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [API OQ 29][api-q] · [roadmap OQ 17][rm-q] · [test plan OQ 4n][tp-q] · [availability OQ 3][avail-q] · [data model §5.20][data-520]
 
 #### Q-002 · What does the QR-link encryption bind to, when the IDs do not exist yet?
+- **Answered — D-26** (2026-10-21): the AES-256-GCM associated data is the QR token hash and the email type, both known before the database call; the outbox and reservation IDs are not used.
 - **In plain words:** the QR link in a queued email is stored encrypted. The security doc ties the encryption to the email's row number and the booking's ID, but the server encrypts before the database has created either one.
 - **Detail:** [Security §4.5.4][sec-454] (option B) uses AES-256-GCM with "the outbox row ID and the reservation ID" as associated data. [API §1.13][api-113] has the server make the token and encrypt the link *before* it calls `app.book_reservation`, `app.create_staff_reservation`, or `app.recreate_expired`. Both IDs are made by the database during that call: the outbox ID is an identity column and reservation IDs come from `gen_random_uuid()` ([data model §4, §5.12][data-512]).
 - **Why it matters:** as written, the encryption step cannot be built. TC-SEC-29, TC-DB-81, and TC-UT-04 depend on it.
@@ -141,6 +145,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [security §4.5.4][sec-454] · [API §1.13][api-113] · [data model §5.12][data-512]
 
 #### Q-003 · What does the customer see when the robot check fails, and does every attempt count toward the limit?
+- **Answered — D-27** (2026-10-21): one generic message for both bot checks, "We could not check that you are not a robot. Please try again."; every attempt counts toward the submission rate limit.
 - **In plain words:** the booking form has a hidden robot check. The docs agree on one general message when it fails, but its exact words and one related rule are not confirmed.
 - **Detail:** [booking OQ 5][book-q] (resolved) says both bot checks, the honeypot and Turnstile, return one generic `bot_check_failed`. [Security OQ 24][sec-q] keeps two parts as **[P]**: the one generic message, and every attempt counting toward the submission limit. The draft wording in [UX §3.1.4][ux-form], "We could not check that you are not a robot. Please try again.", cites booking OQ 5 for its wording, and that item closed without wording. TC-SEC-19 runs "if [P] accepted".
 - **Options / recommendation:** one generic message, as [API §2.3][api] already orders the checks; the UX draft wording.
@@ -148,6 +153,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [security OQ 24][sec-q] · [booking OQ 5][book-q] · [UX §3.1.4][ux-form] · [test plan][tp] TC-SEC-19
 
 #### Q-004 · Where do the week-1 test and acceptance testing (UAT) run, and how is production made clean before launch?
+- **Answered — D-28** (2026-10-21): the week-1 test and UAT run on a separate test project (Supabase Free + Vercel), which is also the staging environment during the build; production is created fresh just before launch, so it holds no test records and acknowledgment numbering starts clean; a short-lived restore-test project is allowed.
 - **In plain words:** business records are never deleted. If test bookings are made in the real system, they stay forever and use up acknowledgment numbers.
 - **Example:** a test deposit recorded during UAT in production would take `ACK-2026-0001`, and the first real customer would get a later number.
 - **Options / recommendation:** [ops OQ 46][ops-q] sets out two options: (a) UAT on a separate pre-launch project, with production set up fresh just before launch; (b) UAT in production, then a one-time reset of the business tables and the acknowledgment counters by the Super Admin before the first real customer, recorded as a decision. For week 1, [ops OQ 1][ops-q] **[P]** proposes a separate short-lived week-1 project and a restore-test project, both deleted afterwards. A permanent staging database is [architecture OQ 9][arch-q]: a second free Supabase project with its own keep-alive; how many free projects are allowed is **[U]**.
@@ -155,6 +161,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [roadmap OQ 14][rm-q] · [test plan OQ 3][tp-q] · [ops OQ 46][ops-q] · [ops OQ 1][ops-q] · [architecture OQ 9][arch-q]
 
 #### Q-005 · How do tests set the clock?
+- **Answered — D-29** (2026-10-21): the test clock `app.now()` returns `clock_timestamp()`, except in a test database with the test-only marker, where `SET LOCAL app.test_now` fixes it; `app.manila_today()` derives from it; production has no marker (TC-SEC-54).
 - **In plain words:** many rules depend on "now" (deadlines, "today", reminders). Tests need a safe way to pretend it is a certain time, with no such switch in the real system.
 - **Detail:** [test plan §1.5][tp-15] **[P]** proposes one helper, `app.now()`, that returns `clock_timestamp()`, except in a test database, where a test can fix the time for one transaction (`SET LOCAL app.test_now = …`). It works only when a test-only marker exists; TC-SEC-54 checks that production has none. [API §1.4][api] currently reads `clock_timestamp()` and `app.manila_today()` directly.
 - **Why it matters:** without it, the time-based rules can be tested only through the pure predicates.
@@ -163,30 +170,35 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [test plan OQ 1][tp-q] · [test plan §1.5][tp-15]
 
 #### Q-006 · How is the real website kept from taking bookings before launch?
+- **Answered — D-30** (2026-10-21): a Super-Admin-only setting, `public_booking_open`, false by default. While it is false, online booking is off (`booking_not_open`), the public pages show "Opening soon", and every page sends `noindex`. Turning it on is a launch gate step (G22; new requirement FR-ADM-34).
 - **In plain words:** from the Foundation phase on, every finished change goes live on the production address, which is public. A customer could find it and book before the official opening.
 - **Options / recommendation:** none in the docs.
 - **Who answers:** Super Admin · **Blocks:** Foundation (M3) onwards, until Launch (M11)
 - **Sources:** [roadmap OQ 15][rm-q] (based on [architecture][arch] §2.2 and §11)
 
 #### Q-007 · How is the week-1 result recorded, and what speed target follows from it?
+- **Answered — D-31** (2026-10-21): the go / no-go is recorded as a new decision (the next free D number at that time), listing each item's result and fix; the NFR-03 target is the measured week-1 p95 plus a safety margin.
 - **In plain words:** the week-1 test ends with a clear "go" or "no-go". It needs a fixed place in the records, and it also sets how fast pages must be.
 - **Options / recommendation:** [roadmap OQ 1][rm-q] **[P]**: record it as a new decision in the decision log (D-25 or the next free number), listing each item's result and any fix. The speed target: [NFR-03][nfr] has no number yet; TC-NFR-04 records the week-1 delays (p50, p95), and the go / no-go sets the target ([test plan OQ 8][tp-q]).
 - **Who answers:** Super Admin · **Blocks:** Week-1 spike (M2); gate G9
 - **Sources:** [roadmap OQ 1][rm-q] · [test plan OQ 8][tp-q] · [NFR-03][nfr]
 
 #### Q-008 · Is the week-1 test code thrown away, or does it become the start of Foundation?
+- **Answered — D-32** (2026-10-21): thrown away; Foundation is built properly, test-first.
 - **In plain words:** this decides whether the week-1 code is written quickly as throw-away probes, or carefully, with tests, as the first real code.
 - **Options / recommendation:** none in the docs.
 - **Who answers:** Super Admin · **Blocks:** Week-1 spike (M2) and Foundation (M3)
 - **Sources:** [roadmap OQ 2][rm-q]
 
 #### Q-009 · Which tool proves that two bookings at the same moment never both succeed?
+- **Answered — D-33** (2026-10-21): a two-connection Node/Vitest script against the local Supabase database, racing real transactions; `dblink` is not used.
 - **In plain words:** the most important test is that two people booking the last set at the same instant never both win. That test needs two database connections that overlap on purpose.
 - **Options / recommendation:** [test plan §1.5][tp-15] **[P]**: `dblink` inside pgTAP, or a small two-connection script. Either must hold the first transaction open while the second waits.
 - **Who answers:** Super Admin · **Blocks:** Foundation (M3; E2.3 live-claim guard and its tests)
 - **Sources:** [test plan OQ 2][tp-q] · [test plan §1.5][tp-15]
 
 #### Q-010 · Should mobile numbers that start with +638 be accepted?
+- **Answered — D-34** (2026-10-21): yes. Every valid Philippine mobile number is accepted, including valid 08… numbers, checked with `libphonenumber-js` (full metadata) and saved as E.164 (`+63…`). This changed [BR-11][br]; the database check is now only a format backstop.
 - **In plain words:** the form accepts only numbers in the 09… / +639… form. Research says some valid Philippine mobile numbers may start with +638 **[U]**. If so, those customers could not book.
 - **Example:** a customer types a valid number that starts with +638 and is told it is not a valid mobile number.
 - **Options / recommendation:** [architecture OQ 15][arch-q] asks whether [BR-11][br] should be reviewed, and whether to use `libphonenumber-js` (with full metadata) for normalization. If BR-11 changes, the data model's `reservations_mobile_chk` changes after it.
@@ -194,6 +206,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [architecture OQ 15][arch-q] · [data model §13][data-q] (table) · [BR-11][br]
 
 #### Q-011 · Which values are allowed for prices, stock, and settings?
+- **Answered — D-35** (2026-10-21): prices may be ₱0, so free extras are allowed; an add-on's daily stock may be 0, meaning not available; the setting ranges stay as the docs propose, for the developer to review later.
 - **In plain words:** the system needs limits on what admins can type. Can a price be ₱0? Can daily stock be 0? What range is allowed for deadlines, the notice period, email caps, rate limits, and retention periods?
 - **Example:** the Admin enters ₱0 as the price of a free extra microphone. Is it accepted or refused?
 - **Options / recommendation:** [API OQ 33][api-q] **[P]**: prices must be more than ₱0; a block range covers at most 62 dates. [Data model §4][data] **[P]**: text length limits. [Data model OQ 13][data-q] **[P]**: new defaults such as 5 email send attempts. The valid ranges of the settings are still open ([API OQ 24][api-q]); they become the database checks and `app.setting_value_is_valid`.
@@ -201,6 +214,7 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [administration OQ 13][admin-q] · [API OQ 24, OQ 33][api-q] · [data model OQ 13][data-q] · [staff guide OQ B][staff-q]
 
 #### Q-012 · Two login questions without a proposal: a forced password change, and moving 2FA alone
+- **Answered — D-36** (2026-10-21): (a) yes, a new or reset password must be changed at the next login, through an app-level flag; (b) yes, after a backup-code login an admin may move 2FA to a new phone alone, with the password and a backup code, audited in `security`, and the Super Admin is emailed (new requirement FR-NTF-22), except for his own account.
 - **In plain words:** (a) must a new or reset password be changed at the next login? (b) After logging in with a backup code, can an admin move the 2FA app to a new phone alone, or does the Super Admin have to reset it?
 - **Example:** the Admin's phone is lost. She logs in with a backup code. Can she set up the authenticator app on her new phone herself?
 - **Options / recommendation:** (a) Better Auth has no built-in flag for a forced change ([security OQ 4][sec-q]). (b) none. The rest of the password and backup-code rules are proposed in [security OQ 4 and OQ 5][sec-q] (Q-104, Q-105).
@@ -208,12 +222,14 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 - **Sources:** [security OQ 4][sec-q] · [administration OQ 7, OQ 8][admin-q] · [staff guide OQ B][staff-q]
 
 #### Q-013 · What happens to disabled and former admin accounts?
+- **Answered — D-37** (2026-10-21): (a) the Super Admin can re-enable a disabled account; (b) the daily retention job deletes the login details (password hash, 2FA secrets, backup codes, sessions) 30 days after the disable, and the user row is scrubbed and kept; (c) there is no change-role action.
 - **In plain words:** (a) can a disabled account be switched on again, or is a new account always made? (b) Who deletes a former admin's login details within 30 days ([privacy and retention §6.2][priv]): the automatic clean-up, or the Super Admin by hand? (c) Is there a "change role" action at all?
 - **Options / recommendation:** [data model OQ 8][data-q] **[P]**: admin user rows are scrubbed, never deleted, so acknowledgments keep "received by"; it needs this answer. None for (a) to (c).
 - **Who answers:** Super Admin · **Blocks:** Foundation (M3; E3.4 accounts screen); part (b) also the retention job (E19.1)
 - **Sources:** [administration OQ 11][admin-q] · [data model OQ 8][data-q] · [test plan OQ 6][tp-q] (TC-DB-91)
 
 #### Q-014 · Confirm the [P] proposals that Foundation builds on
+- **Answered — D-38** (2026-10-21): every proposal listed below is accepted as the Foundation baseline, and each can still change through the decision log. In those docs the items are marked "Accepted (D-38)".
 - **In plain words:** Foundation sets up the code repository, the automatic checks, the whole database structure, login with 2FA, and the settings. The technical docs propose how; those proposals must be confirmed or corrected before Foundation starts.
 - **Which ones:** [architecture OQ 1, 2, 8, 10][arch-q] (toolchain, migrations from the developer's laptop, environment variables and one `CRON_SECRET`, CI details) · [data model OQ 1 to 5, 7 to 10, 13][data-q] (one claims table, the `admin_auth` schema, money in centavos, the urgent flag computed, new reservation columns, guard triggers, scrubbed admin rows, no raw IP addresses, reads only through the view, new defaults) · [API OQ 1 to 5, 8, 9][api-q] (call layout, the session check, field limits, the result format, error handling, versions, wire formats) · [security OQ 1 to 13, 30, 31][sec-q] (login, authorization, logging, role timeouts, platform settings) · [ops OQ 1 to 11][ops-q] (environments and setup) · [roadmap OQ 3, 4, 10][rm-q] (all tables in Foundation, the keep-alive in Foundation, one plan per phase) · [test plan OQ 12][tp-q] (test conventions).
 - **The questions they answer** for Foundation are Q-095 to Q-097 and Q-099 to Q-110 in section 3.5.2.
@@ -776,6 +792,8 @@ Each question appears once, with every doc that raises it. Under the roadmap's p
 
 #### 3.5.1 [P] proposals per doc
 
+The [P] items listed in D-38 (Q-014) are accepted as the Foundation baseline (2026-10-21); the counts below were taken before that.
+
 "Labels" counts each "[P] (new in this doc)" or "[P] (reconciled 2026-10-21)" in the doc (the non-functional requirements use "[P] (new)"). One proposal can carry the label twice, in the text and again in its Open questions list, so the number of separate proposals is lower. "In its Open questions" counts the [P] items that doc lists for review.
 
 | Doc | Labels | In its Open questions | The most important ones | Where to review |
@@ -804,7 +822,7 @@ Fourteen security test cases run only "if [P] accepted", so the security review 
 
 #### 3.5.2 Technical questions for the developer
 
-Each row is a question raised in an earlier doc. Most already have a [P] answer in a later doc, which the developer confirms or corrects. **Who answers:** Super Admin for every row.
+Each row is a question raised in an earlier doc. Most already have a [P] answer in a later doc, which the developer confirms or corrects. **Who answers:** Super Admin for every row. Where a row's proposal is one that D-38 lists (Q-014), it is accepted as the Foundation baseline; Q-104 and Q-105 are also settled by D-36. Q-095 ([API OQ 30][api-q], [architecture OQ 3][arch-q]), the lock order in Q-096 ([availability OQ 10][avail-q]), and Q-109 ([API OQ 17][api-q]) rest on proposals that D-38 does not list, so they stay open.
 
 | ID | Question (plain) | Why it matters | Docs' proposal | Blocks | Sources |
 |---|---|---|---|---|---|
@@ -872,7 +890,7 @@ Each row is a question raised in an earlier doc. Most already have a [P] answer 
 | 1 | Verified TLS with the Supabase CA works against the pooler | TC-W1-01 | [architecture][arch] §6.2; [security][sec] §4.3 |
 | 2 | Role timeouts set on `app_rw` apply through the shared pooler | TC-W1-01, TC-SEC-18 | [data model][data] §2.3; [security][sec] §4.3; [architecture §14][arch-14] |
 | 3 | The pooler accepts a SCRAM role with no `VALID UNTIL`; the direct host is unreachable from Vercel | TC-W1-01 | [architecture][arch] §6.1, [§14][arch-14] |
-| 4 | Latency from `sin1` to the database (sets the speed target, Q-007) | TC-W1-01, TC-NFR-04 | [NFR-03][nfr] |
+| 4 | Latency from `sin1` to the database (sets the speed target: the p95 plus a margin, D-31) | TC-W1-01, TC-NFR-04 | [NFR-03][nfr] |
 | **Week 1, item 2: booking under load** | | | |
 | 5 | Exactly one success from parallel requests on the deployed function | TC-W1-02 (5 runs × 20 requests) | [architecture §14.1][arch-141] |
 | 6 | The pooler's client count stays stable (a known leak was reported fixed) | TC-W1-02, TC-W1-08; then the weekly check | [architecture §14][arch-14] |
@@ -931,8 +949,8 @@ Each row is a question raised in an earlier doc. Most already have a [P] answer 
 | **Named in open questions** | | | |
 | 51 | Resend's free plan sends only to the account's own address until a domain is verified | From the vendor terms (G3); decides O-05 (Q-070, G13) | [ops OQ 44][ops-q] |
 | 52 | Whether GitHub offers protected environments on a private free repository | At backup setup (E20.1; Q-142) | [ops OQ 45][ops-q] |
-| 53 | How many free Supabase projects one account may have | From the vendor terms; before Q-004 is answered | [architecture OQ 9][arch-q] |
-| 54 | Whether some valid Philippine mobile numbers start with +638 | Before Foundation (Q-010) | [architecture OQ 15][arch-q] |
+| 53 | How many free Supabase projects one account may have (the test project, production, and a restore-test project, D-28) | From the vendor terms; before production is created | [architecture OQ 9][arch-q] |
+| 54 | ~~Whether some valid Philippine mobile numbers start with +638~~ **No longer needed:** D-34 accepts every valid number, checked with `libphonenumber-js` | — (Q-010 answered) | [architecture OQ 15][arch-q] |
 | 55 | How Better Auth 1.7.12 rotates `BETTER_AUTH_SECRETS` | At setup (Foundation) | [ops][ops] §9.6; [architecture][arch] §8.1 |
 | 56 | Whether a data-only restore with `session_replication_role` works as planned | The restore test (TC-NFR-16, G10) | [ops OQ 21][ops-q] |
 | 57 | drizzle-kit's `migrations.prefix: 'supabase'` option and Better Auth's session IP-tracking option name | At setup; week-1 items 3 and "also checked" | [architecture][arch] §9; [data model OQ 9][data-q] |
@@ -942,7 +960,7 @@ Each row is a question raised in an earlier doc. Most already have a [P] answer 
 
 ## 5. Pre-launch gates
 
-All 21 gates must be cleared before the website opens (M10). The gates are owned by [roadmap §5][rm-5]; the evidence for each is in [ops §10][ops-10]. Owners come from the ops checklist; where it has no row yet, the owner is "not named". No doc reports any gate as cleared.
+All 22 gates must be cleared before the website opens (M10); G22 ends with the launch step itself. The gates are owned by [roadmap §5][rm-5]; the evidence for each is in [ops §10][ops-10]. Owners come from the ops checklist; where it has no row yet, the owner is "not named". No doc reports any gate as cleared.
 
 | # | Gate | Owner | Status | Notes |
 |---|---|---|---|---|
@@ -954,7 +972,7 @@ All 21 gates must be cleared before the website opens (M10). The gates are owned
 | G6 | DPO and privacy contact (O-09) | Admin and Super Admin | Not started | A gate **[P]**; task A-4 |
 | G7 | SDAU (O-10) | Lawyer | Not started | A gate **[P]**; whether it holds launch is Q-077 |
 | G8 | Registration and the acknowledgment name (O-11) | CPA or lawyer; the Admin | Not started | A gate **[P]**; the current name is a knowingly accepted risk **[C]** (D-21) |
-| G9 | Week-1 go recorded | Super Admin | Not started | Section 4, rows 1 to 40; Q-007 |
+| G9 | Week-1 go recorded | Super Admin | Not started | Section 4, rows 1 to 40; recorded as a new decision (D-31) |
 | G10 | Restore test | Super Admin | Not started | The second restore test (NFR-29), at M8 |
 | G11 | UAT accepted | Admin and Super Admin | Not started | M9; task A-8 |
 | G12 | Content in place (O-02 to O-05) | Admin and Super Admin | Not started | A gate **[P]**; section 3.3 |
@@ -967,6 +985,7 @@ All 21 gates must be cleared before the website opens (M10). The gates are owned
 | G19 | First offline backup copy | Super Admin | Not started | Plus the sealed second copy of the backup key |
 | G20 | Runbooks ready | Not named (no ops row yet) | Not started | A gate **[P]**; the runbooks are drafted in [ops][ops] §3 to §8 and await review |
 | G21 | Staff guide handed over | Admin | Not started | The [staff guide][staff] is drafted; task A-9 |
+| G22 | Fresh production and the booking switch | Super Admin | Not started | **[C]** (D-28, D-30): production created fresh just before launch, with `public_booking_open` off; turning it on is the launch step; ops §10 row 18; task D-6 |
 
 ---
 

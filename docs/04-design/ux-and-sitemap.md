@@ -145,7 +145,7 @@ Every page in the MVP. "Who sees it" describes who can open the page; who may *d
 | P13 | QR link page | `/r/[token]` | Anyone who opens a QR code | "Present this at our office", or "not found / no longer valid", or the admin reservation page | FR-PUB-09 | Yes |
 | **Admin panel** | | | | | | |
 | A1 | Login and 2FA | `/admin/login` | Anyone can open it; only the two admins can log in, and there is no sign-up | Email and password, then the authenticator code or a backup code | FR-ADM-01 | Yes |
-| A2 | 2FA setup and backup codes | `/admin/setup-2fa` | An admin on first login, or after a reset | Connect the authenticator app; store the backup codes offline | FR-ADM-01, FR-ADM-30 ([roles §5.2][roles]) | Yes |
+| A2 | Password change, 2FA setup, and backup codes | `/admin/change-password`, then `/admin/setup-2fa` | An admin on first login, or after a reset | Choose a new password first **[C]** ([D-36][dl]); connect the authenticator app; store the backup codes offline | FR-ADM-01, FR-ADM-30 ([roles §5.2][roles]) | Yes |
 | A3 | Dashboard | `/admin` | Either admin | What needs attention now; the paused banner | FR-ADM-02, FR-ADM-29 | Yes |
 | A4 | Reservation list and search | `/admin/reservations` | Either admin | Find any reservation | FR-ADM-03 | Yes |
 | A5 | Reservation page and action panel | `/admin/reservations/[id]` | Either admin | Everything about one reservation; the allowed actions | FR-ADM-04 to FR-ADM-23, FR-ADM-31, FR-ADM-32, FR-NTF-21 | Yes |
@@ -154,7 +154,7 @@ Every page in the MVP. "Who sees it" describes who can open the page; who may *d
 | A8 | Blocks | `/admin/blocks` | Either admin; whole-date blocks: Super Admin only | Block or unblock a set, the room, or a whole date | FR-ADM-25 | Yes |
 | A9 | Catalog | `/admin/catalog` | Either admin | Packages, add-ons, prices, daily stock | FR-ADM-26 | Yes |
 | A10 | Settings | `/admin/settings` | Super Admin only | Setting groups, delivery slots, delivery sets and the room | FR-ADM-27, FR-ADM-28 | Yes |
-| A11 | Admin accounts | `/admin/accounts` | Super Admin only | Create, disable, reset, and sign out admin accounts | FR-ADM-30 | Yes |
+| A11 | Admin accounts | `/admin/accounts` | Super Admin only | Create, disable, re-enable, reset, and sign out admin accounts | FR-ADM-30 | Yes |
 | A12 | Audit log | `/admin/audit` | Either admin | Who did what, when, and why | FR-ADM-32 | Yes |
 | A13 | Health panel | `/admin/health` | Either admin | Scheduled jobs, emails, caps, and storage | FR-ADM-33 | Yes |
 
@@ -183,6 +183,7 @@ Each screen lists its parts, what each part shows or does, and the source that r
 |---|---|
 | Normal | The parts above. No personal data ([FR-PUB-01][fr]). |
 | Online booking paused | No change on this page. The calendar and the form show the paused banner ([BR-07a][br]). Whether the home page should show it too is open question B4. |
+| Online booking not open yet (before launch) | The "Opening soon" message (section 7.2) in place of "Book now" and "Check available dates"; "See packages" and the contact details stay. Every page sends `noindex` **[C]** ([D-30][dl]; [FR-ADM-34][fr]). |
 
 #### 3.1.2 Packages and add-ons (P2)
 
@@ -221,6 +222,7 @@ Each screen lists its parts, what each part shows or does, and the source that r
 | Loading | The list or grid outline with placeholder rows (section 5.7). |
 | Normal | Labels for every date in view. Today can show **Full** when no start time is left that meets the notice period ([BR-09][br], [EC-07][ec]). |
 | Online booking paused | The banner above the calendar. Labels stay visible, but no date can be picked (proposal 9 in section 8). |
+| Online booking not open yet (before launch) | The "Opening soon" message with the contact details, and no dates **[C]** ([D-30][dl]; [FR-ADM-34][fr]). |
 | Could not load | "We could not load the calendar. Please try again, or message or call us." with a "Try again" button. |
 
 **Developer notes.** Always live, never cached; one call to the availability function per view; no polling ([NFR-03][nfr]; [WF-05A][wf-avail] developer notes, `app.availability_calendar`). The calendar component is shared with step 1 of the form (proposal 1).
@@ -294,6 +296,7 @@ flowchart TD
 | State | What the screen shows | Source |
 |---|---|---|
 | Online booking paused | In place of the form: the paused banner and the contact details. The draft stays in the browser session. | [BR-07a][br], [FR-PUB-06][fr] |
+| Online booking not open yet (before launch) | In place of the form: the "Opening soon" message and the contact details. A submit that reaches the server anyway is refused (`booking_not_open`) | [FR-ADM-34][fr], **[C]** [D-30][dl] |
 | Field errors | A message next to each field, and a short list at the top of the step that moves the focus to the first error | [NFR-17][nfr] (item 4), [WF-01B][wf-book] |
 | Sending | The button reads "Sending…" and cannot be pressed again. A double press or a retry still returns the same request. | [FR-PUB-06][fr], [EC-01][ec] |
 | Just taken (set or room) | "Sorry, this date was just taken." with up to 3 nearby Available dates as buttons, and "See the calendar". Everything typed is kept. | [FR-PUB-06][fr], [EC-03][ec], [EC-04][ec]; proposal 2 |
@@ -301,7 +304,7 @@ flowchart TD
 | Too soon | "This start time is now too soon to book online. Please pick a later time, or message or call us." | [BR-06][br], [EC-06][ec] |
 | Open-request limit | "This mobile number already has an open request for this date." or "This mobile number already has the most open requests allowed." Then "Message or call us if you need help." | [BR-07][br], [EC-09][ec], [EC-10][ec] |
 | Outside the booking window | "This date is too far ahead to book online." | [BR-09][br], [EC-08][ec] |
-| Bot check failed | "We could not check that you are not a robot. Please try again." | [NFR-12][nfr]; wording: [booking-and-submission][wf-book] open question 5 |
+| Bot check failed | "We could not check that you are not a robot. Please try again." The same message for the honeypot and Turnstile; the attempt still counts toward the submission limit | [NFR-12][nfr]; wording confirmed **[C]** ([D-27][dl]) |
 | Too many tries | "Too many requests from this device. Please wait a while and try again, or message or call us." | [NFR-11][nfr], [EC-14][ec] |
 | No connection | "We could not reach the server. Your answers are saved. Try again." Trying again sends the same duplicate-submission key, so no second request is made. | [FR-PUB-06][fr], [EC-01][ec] |
 | New website version | "A new version of this page is ready. Reload to continue. Your answers are kept." | [FR-PUB-06][fr], [EC-02][ec] |
@@ -455,12 +458,13 @@ Every admin screen has the admin menu (section 4.2), the name and role of the lo
 |---|---|---|
 | 1. Password | Email, password, "Log in". No sign-up and no "create account" link. | [FR-ADM-01][fr] |
 | 2. Code | A 6-digit code field with the number keypad, "Verify", and "Use a backup code instead", which swaps in a backup-code field | [FR-ADM-01][fr], [roles §5.2][roles] |
-| First login, or after a reset (A2) | 1. A QR code and a typed key for the authenticator app. 2. A field for the first code from the app (a [P] detail of [WF-09B][wf-admin]). 3. The backup codes, with "Print" and "Download", and the advice "Keep these codes offline, for example printed at home." 4. A tick box "I have stored my backup codes", then "Continue". | [FR-ADM-01][fr], [roles §5.2][roles], [WF-09B][wf-admin] |
+| First login, or after a reset (A2) | 0. "Choose a new password": the new password twice, then "Save"; nothing else opens until it is saved **[C]** ([D-36][dl]). 1. A QR code and a typed key for the authenticator app. 2. A field for the first code from the app (a [P] detail of [WF-09B][wf-admin]). 3. The backup codes, with "Print" and "Download", and the advice "Keep these codes offline, for example printed at home." 4. A tick box "I have stored my backup codes", then "Continue". | [FR-ADM-01][fr], [roles §5.2][roles], [WF-09B][wf-admin] |
 
 | State | What the screen shows | Source |
 |---|---|---|
 | Wrong email, password, or code | "The email, password, or code is not correct." The same message for each. | [WF-09A][wf-admin] step 6; proposal 13 |
 | Locked or too many tries | "Too many tries. Please wait and try again later." | [NFR-11][nfr], [EC-72][ec]; proposal 13 |
+| After a login with a backup code | A notice "You used a backup code. Move your 2FA to a new phone?" with "Move 2FA": the password, a backup code, the new QR code, and the first code from the new phone. Then: "2FA moved. The Super Admin has been told." (not shown to the Super Admin for his own account) **[C]** ([D-36][dl]) | [FR-ADM-30][fr], [FR-NTF-22][fr], [WF-09D][wf-admin] |
 | Success | The page the admin first asked for, or the dashboard | [FR-ADM-01][fr], [EC-73][ec] |
 
 #### 3.2.2 Dashboard (A3)
@@ -615,8 +619,8 @@ Every admin screen has the admin menu (section 4.2), the name and role of the lo
 | Part | Contents | Source |
 |---|---|---|
 | Tabs | Packages · Add-ons, each with an "Active" and "Archived" filter | [FR-ADM-26][fr] |
-| Package form | Name, inclusions (one per line), price | [FR-ADM-26][fr] |
-| Add-on form | Name, price, daily stock | [FR-ADM-26][fr] |
+| Package form | Name, inclusions (one per line), price (₱0.00 allowed) | [FR-ADM-26][fr]; **[C]** [D-35][dl] |
+| Add-on form | Name, price (₱0.00 allowed, for a free extra), daily stock (0 means not available) | [FR-ADM-26][fr]; **[C]** [D-35][dl] |
 | Archive | "Archive" with a confirmation. Items are archived, never deleted. | [FR-ADM-26][fr], [catalog-and-payments §1.6][cat] |
 | Helper line | "A new price applies to new requests only. Existing bookings keep their price." | [FR-ADM-26][fr], [D-12][dl] |
 
@@ -635,28 +639,29 @@ Every admin screen has the admin menu (section 4.2), the name and role of the lo
 | Delivery slots | A list: label, start time, end time, active; "Add slot", "Edit", "Archive" | [FR-ADM-28][fr], [catalog-and-payments §1.3][cat] |
 | Sets and the room | A list: kind, name, active; "Add set", "Rename", "Deactivate" | [FR-ADM-27][fr] |
 | Online-booking pause | Shown as read-only text ("Online booking is open", or "paused until 3:45 PM"), never as a field | [FR-ADM-28][fr], [WF-08F][wf-admin] step 3 |
+| Pre-launch switch | "Online booking open": a switch, off until launch, with the confirmation "Customers will be able to book online, and search engines may list the site." | [FR-ADM-34][fr], **[C]** [D-30][dl] |
 | Save confirmation | "This does not change existing bookings." before each save | [FR-ADM-28][fr], [EC-55][ec], [EC-56][ec] |
 
 | State | What the screen shows | Source |
 |---|---|---|
 | The Admin opens it | "Only the Super Admin can open this page." The menu does not show it to the Admin. | [roles §2.6][roles], [EC-74][ec] |
-| Value not valid | A message next to the field (valid values: [administration][wf-admin] open question 13) | [NFR-21][nfr] |
+| Value not valid | A message next to the field (the valid ranges are those proposed in the data model, [D-35][dl]) | [NFR-21][nfr] |
 | Archive or deactivate refused | The message and the list of reservations that use it | [BR-10][br], [EC-58][ec], [EC-59][ec] |
 
 #### 3.2.10 Admin accounts (A11, Super Admin only)
 
-**Purpose:** create, disable, reset, and sign out admin accounts ([FR-ADM-30][fr], [WF-09F][wf-admin], [WF-09G][wf-admin]).
+**Purpose:** create, disable, re-enable, reset, and sign out admin accounts ([FR-ADM-30][fr], [WF-09F][wf-admin], [WF-09G][wf-admin]).
 
 | Part | Contents | Source |
 |---|---|---|
 | Account list | Name, email, role, active or disabled | [FR-ADM-30][fr] |
-| Actions per account | "Disable", "Reset", "Sign out", each with a confirmation that says what happens. "Disable" is not offered on the Super Admin's own account. | [FR-ADM-30][fr], [roles §5.1][roles] |
+| Actions per account | "Disable", "Reset", "Sign out", each with a confirmation that says what happens. "Disable" is not offered on the Super Admin's own account. A disabled account shows "Re-enable" instead **[C]** ([D-37][dl]). No "change role" action | [FR-ADM-30][fr], [roles §5.1][roles] |
 | Create Admin | Name, email, first password; offered only when no Admin is active | [roles §5.1][roles], [EC-75][ec] |
 
 | State | What the screen shows | Source |
 |---|---|---|
 | An Admin is already active | "Create Admin" is replaced by "Disable the current Admin first to create a new one." | [roles §5.1][roles] |
-| Reset done | "Password reset. The person must set up 2FA again and is signed out everywhere." How the password is handed over: [administration][wf-admin] open question 8 | [FR-ADM-30][fr] |
+| Reset done | "Password reset. The person must set up 2FA again and is signed out everywhere." Hand the password over in person; the person changes it at the next login ([D-36][dl]) | [FR-ADM-30][fr] |
 
 #### 3.2.11 Audit log (A12)
 
@@ -858,6 +863,8 @@ Draft wording **[P] (new in this doc)**. Legal and fixed texts are not drafted h
 | **Not yet confirmed** | Confirmation; form step 3; status page while Pending Confirmation or Awaiting Deposit; the request-received email | "Not yet confirmed. Your booking is confirmed only when your status page says **Confirmed**." | [FR-PUB-07][fr], [FR-NTF-01][fr], [lc §1.1][lc] |
 | **Just taken** | Form, after Submit | "Sorry, this date was just taken by another booking. Your details are saved. Pick another date:" followed by up to 3 nearby Available dates and "See the calendar". | [FR-PUB-06][fr], [EC-03][ec], [EC-04][ec]; proposal 2 |
 | **Paused banner (public)** | Calendar and form | "Online booking is paused for a short while. Please message or call us to book." with the phone number and the Messenger link from the business info | [BR-07a][br], [FR-PUB-03][fr], [FR-PUB-06][fr] |
+| **Opening soon** | Home, calendar, and form, while online booking is not open yet | "Online booking is opening soon. Please message or call us to book." with the phone number and the Messenger link from the business info | [FR-ADM-34][fr], **[C]** [D-30][dl] |
+| **Bot check failed** | Form, and the status lookup | "We could not check that you are not a robot. Please try again." (confirmed wording) | [NFR-12][nfr], **[C]** [D-27][dl] |
 | **Paused banner (admin)** | Dashboard | "Online booking is paused until 3:45 PM because many requests came in at once. Check the newest requests for fakes." and "Resume online booking" | [BR-07a][br], [FR-ADM-02][fr], [FR-ADM-29][fr], [WF-08G][wf-admin] |
 | **Acknowledgment disclaimer** | Every acknowledgment | Not drafted here. The fixed statement and the forbidden words are in [privacy-and-retention §7.1][priv]; print the statement word for word. | [privacy-and-retention §7.1][priv], [catalog-and-payments §5.3][cat] |
 | **Privacy summary** | Form step 3 | Not drafted here. Its content follows the notice in [privacy-and-retention §5.1][priv] and is reviewed with the lawyer (O-08). | [FR-PUB-06][fr] |

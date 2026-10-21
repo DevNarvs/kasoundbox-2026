@@ -11,6 +11,7 @@
 
 - Each decision has an ID (D-01, D-02, …). Each entry gives the date, the decision, the options that were considered, a short rationale (why we chose it), and the docs it affects.
 - All decisions in this first version were made on 2026-10-21, in the brainstorming session, by the developer (Super Admin) on behalf of the business. They were then approved together with the design spec (D-23).
+- D-25 to D-38 were also made on 2026-10-21, by the developer: they are his answers to the urgent questions Q-001 to Q-014 of the [project status](project-status.md) (§3.1).
 - Labels: **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item (section 3).
 - This log says *what* was decided and *why*. The detailed rule lives in the doc that owns it. Each entry states the decision briefly and links to that doc for the full rule.
 - Words with a special meaning, such as *hold*, *block*, or *service start*, are explained in the [glossary](glossary.md).
@@ -47,6 +48,20 @@
 | D-22 | Repository | The GitHub repository is made private before backups are added | [C] |
 | D-23 | Documentation | Spec approved and frozen; these docs are the source of truth; English; written in reviewed batches | [C] |
 | D-24 | Voiding payments | Both admins can void a wrongly recorded deposit, balance, or refund record, with a reason | [C] |
+| D-25 | Overdue check | One `IMMUTABLE` overdue helper that takes the time as an argument; a paused hold is overdue from its service start | [C] |
+| D-26 | QR-link encryption | The encrypted QR link is bound to the QR token hash and the email type, not to database IDs | [C] |
+| D-27 | Bot-check message | One generic message for the honeypot and Turnstile; every attempt counts toward the submission limit | [C] |
+| D-28 | Test project | Week 1 and UAT run on a separate test project; production is created fresh just before launch | [C] |
+| D-29 | Test clock | Database functions read the time through `app.now()`, which tests can fix only where a test-only marker exists | [C] |
+| D-30 | Pre-launch switch | A Super-Admin-only setting keeps online booking closed ("Opening soon", `noindex`) until launch | [C] |
+| D-31 | Week-1 result | The week-1 go / no-go is recorded as a decision; the speed target is the measured p95 plus a margin | [C] |
+| D-32 | Week-1 code | The week-1 spike code is thrown away; Foundation is built test-first | [C] |
+| D-33 | Concurrency harness | A two-connection Node/Vitest script races real transactions on the local database; no `dblink` | [C] |
+| D-34 | Mobile numbers | Every valid Philippine mobile number is accepted (also 08…), checked with `libphonenumber-js`, saved as E.164; changes BR-11 | [C] |
+| D-35 | Prices and stock | Prices may be ₱0; an add-on's daily stock may be 0; setting ranges stay as proposed | [C] |
+| D-36 | Passwords and 2FA | A new or reset password is changed at the next login; after a backup-code login, an admin may move 2FA alone | [C] |
+| D-37 | Disabled accounts | The Super Admin can re-enable an account; the retention job deletes login details 30 days after a disable; no role change | [C] |
+| D-38 | Foundation baseline | The [P] proposals that Foundation builds on are accepted as its baseline | [C] |
 
 ---
 
@@ -490,6 +505,245 @@ The full retention schedule and the wording rules for acknowledgments are define
 
 ---
 
+### D-25 · The overdue check takes the time as an argument
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-001 (developer's answer)
+
+**Decision.**
+- The one shared helper that decides whether a hold is overdue is `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)`. It takes the time as an argument and is `IMMUTABLE`. This is the form in the data model and the test plan.
+- A hold whose expiry is paused counts as overdue from its service start ([BR-12](../01-requirements/business-rules.md): the pause never runs past the service start).
+- The calendar, the status page, the admin views, every function, and the expiry job use this one helper.
+
+**Options considered.** `app.hold_is_overdue(reservation)`, which reads the time itself (the API specification's draft), or the form with the time as an argument (the data model and the test plan).
+
+**Rationale.** A helper that takes the time as an argument gives the same answer for the same moment everywhere, and tests can check it at any moment directly. With one helper, the calendar and the Submit check never disagree.
+
+**Docs affected:** [api-specification](../05-technical/api-specification.md) (§5.1, §5.2, open question 29) · [data-model](../05-technical/data-model.md) (§5.20, §8) · [availability-and-conflicts](../03-workflows/availability-and-conflicts.md) (open question 3) · [reservation-lifecycle](../02-domain/reservation-lifecycle.md) (§3.3, §4.3) · [roadmap](../06-delivery/roadmap.md) (open question 17) · [test-plan](../06-delivery/test-plan.md) (open question 4n)
+
+---
+
+### D-26 · The QR-link encryption is bound to the token hash and the email type
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-002 (developer's answer)
+
+**Decision.**
+- The QR link in a queued request-received email stays encrypted with AES-256-GCM (option B of [security](../05-technical/security.md) §4.5.4).
+- Its associated data is the QR token's hash and the email type. The server knows both before it calls the database.
+- The outbox row ID and the reservation ID are not used: the database creates both during that call.
+
+**Options considered.** The outbox row ID and the reservation ID as associated data (the security doc's draft, which could not be built), or the token hash and the email type.
+
+**Rationale.** Both values exist before the database call, so the server can encrypt as designed. A ciphertext still cannot be moved to another reservation's row or another email type, and it stops decrypting once the QR code is reissued, because the hash changes.
+
+**Docs affected:** [security](../05-technical/security.md) (§4.5.4) · [api-specification](../05-technical/api-specification.md) (§1.13) · [data-model](../05-technical/data-model.md) (§5.12)
+
+---
+
+### D-27 · One generic message for a failed bot check
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-003 (developer's answer)
+
+**Decision.**
+- Both bot checks, the honeypot and Turnstile, show one generic message: "We could not check that you are not a robot. Please try again."
+- Every attempt counts toward the submission rate limit ([NFR-11](../01-requirements/non-functional-requirements.md)), including a repeat with the same duplicate-submission key.
+
+**Options considered.** One message for both checks, or a message per check; counting every attempt, or only accepted ones.
+
+**Rationale.** One message never tells a bot which check caught it. Counting every attempt means retries cannot get round the limit.
+
+**Docs affected:** [security](../05-technical/security.md) (§4.4, open question 24) · [ux-and-sitemap](../04-design/ux-and-sitemap.md) (§3.1.4) · [api-specification](../05-technical/api-specification.md) (§1.7, §2.3) · [test-plan](../06-delivery/test-plan.md) (TC-SEC-19, TC-SEC-20)
+
+---
+
+### D-28 · A separate test project; production is created fresh before launch
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-004 (developer's answer)
+
+**Decision.**
+- The week-1 test and acceptance testing (UAT) run on a separate test project (Supabase Free and Vercel). During the build it is also the staging environment.
+- Production is created fresh just before launch. So it holds no test records, and acknowledgment numbering starts clean.
+- A short-lived restore-test project is allowed, as [deployment-and-operations](../07-operations/deployment-and-operations.md) open question 1 proposes.
+
+**Options considered.** From [deployment-and-operations](../07-operations/deployment-and-operations.md) open question 46: (a) UAT on a separate pre-launch project, with production set up fresh just before launch; (b) UAT in production, then a one-time reset of the business tables and the acknowledgment counters before the first real customer. Option (a) was chosen.
+
+**Rationale.** Business records are never deleted ([NFR-22](../01-requirements/non-functional-requirements.md)). A test booking in production would stay forever and use up acknowledgment numbers. A fresh production needs no reset.
+
+**Docs affected:** [deployment-and-operations](../07-operations/deployment-and-operations.md) (§1, §2, §5.5, §10, open questions 1 and 46) · [roadmap](../06-delivery/roadmap.md) (§1.4, §1.5, §1.11, §1.12, §5, open question 14) · [test-plan](../06-delivery/test-plan.md) (§1.2, §4, §5.1, §6.5, open question 3) · [architecture](../05-technical/architecture.md) (§8.2, §10.4, open question 9) · [project-status](project-status.md) (§4)
+
+---
+
+### D-29 · A test clock, `app.now()`
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-005 (developer's answer)
+
+**Decision.**
+- Database functions read the current time only through `app.now()`.
+- `app.now()` returns `clock_timestamp()`. The one exception is a test database that has the test-only marker: there, a test fixes the time for its own transaction with `SET LOCAL app.test_now`.
+- `app.manila_today()` is worked out from `app.now()`.
+- Production has no marker; TC-SEC-54 checks this.
+
+**Options considered.** Testing the time-based rules only through the pure predicates, or a settable test clock guarded by a test-only marker (the test plan's proposal).
+
+**Rationale.** Many rules depend on "now". A settable clock lets the database tests check deadlines, the notice period, Manila midnight, reminders, acknowledgment years, and retention at exact moments, while production always uses the real time.
+
+**Docs affected:** [api-specification](../05-technical/api-specification.md) (§1.4, §5.1 to §5.3) · [data-model](../05-technical/data-model.md) (§5.20, §8) · [architecture](../05-technical/architecture.md) (§6.3) · [functional-requirements](../01-requirements/functional-requirements.md) (§5, developer note) · [reservation-lifecycle](../02-domain/reservation-lifecycle.md) (§4.3) · [test-plan](../06-delivery/test-plan.md) (§1.5, open question 1, TC-SEC-54)
+
+---
+
+### D-30 · A pre-launch switch for online booking
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-006 (developer's answer)
+
+**Decision.**
+- A setting, `public_booking_open`, says whether online booking is open. Its default is false. Only the Super Admin can change it.
+- While it is false, online booking is off: a submit is refused, the public pages show "Opening soon", and every page sends `noindex`. Bookings that staff enter for phone, walk-in, and Facebook customers are not affected.
+- Turning it on is a step of the launch gate.
+
+**Options considered.** None were in the docs ([roadmap](../06-delivery/roadmap.md) open question 15).
+
+**Rationale.** From Foundation on, every merge to `main` deploys a public website. The switch keeps that website from taking real bookings, or showing in search results, before the official opening.
+
+**Docs affected:** [functional-requirements](../01-requirements/functional-requirements.md) (FR-ADM-34, new) · [data-model](../05-technical/data-model.md) (§7) · [api-specification](../05-technical/api-specification.md) (§1.7, §2.1 to §2.3, §2.11, §3.7, §5.3, §7) · [roles-and-permissions](../01-requirements/roles-and-permissions.md) (§2.6) · [ux-and-sitemap](../04-design/ux-and-sitemap.md) (§3.1, §3.2.9, §7.2) · [roadmap](../06-delivery/roadmap.md) (§1.13, §2.1, §5 gate G22, open question 15) · [deployment-and-operations](../07-operations/deployment-and-operations.md) (§2, §10) · [test-plan](../06-delivery/test-plan.md) (TC-DB-98, TC-SEC-55, TC-E2E-36) · [staff-guide](../07-operations/staff-guide.md) (other Super Admin tasks)
+
+---
+
+### D-31 · How the week-1 result and the speed target are recorded
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-007 (developer's answer)
+
+**Decision.**
+- The week-1 go / no-go is recorded as a new decision in this log, with the next free D number at that time. It lists each week-1 item's result and its fix.
+- The speed target of [NFR-03](../01-requirements/non-functional-requirements.md) is set at the same time: the p95 measured in week 1, plus a safety margin.
+
+**Options considered.** A decision in this log (the roadmap's proposal), or only the test plan's results record; a target picked in advance, or one set from the measured figures.
+
+**Rationale.** Decisions that change the plan already live in this log. A target set from real measurements fits the free services actually used.
+
+**Docs affected:** [roadmap](../06-delivery/roadmap.md) (§1.4, open question 1) · [test-plan](../06-delivery/test-plan.md) (§3.9, §4, TC-NFR-04, open question 8) · [non-functional-requirements](../01-requirements/non-functional-requirements.md) (NFR-03)
+
+---
+
+### D-32 · The week-1 spike code is thrown away
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-008 (developer's answer)
+
+**Decision.** The week-1 spike code is written as quick probes and then thrown away. Foundation is built properly, test-first.
+
+**Options considered.** Throw the spike code away, or keep it as the start of Foundation.
+
+**Rationale.** The spike's job is to answer the unverified questions quickly. Keeping its code would carry untested shortcuts into the base of the system.
+
+**Docs affected:** [roadmap](../06-delivery/roadmap.md) (§1.4, §1.5, open question 2)
+
+---
+
+### D-33 · The concurrency harness: two real connections from Node/Vitest
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-009 (developer's answer)
+
+**Decision.** The tests that race two sessions use a small Node/Vitest script with two connections to the local Supabase database. It races real transactions: session A holds its transaction open while session B waits. `dblink` is not used.
+
+**Options considered.** `dblink` inside pgTAP, or a two-connection script (both in the test plan).
+
+**Rationale.** Two real connections behave like two real callers, need no extra database extension, and keep one transaction open across steps, which a single pgTAP transaction cannot do.
+
+**Docs affected:** [test-plan](../06-delivery/test-plan.md) (§1.5, §2.1, open question 2, and the cases that name the harness: TC-DB-10 to TC-DB-13, TC-DB-66, TC-DB-83, TC-DB-84, TC-DB-92)
+
+---
+
+### D-34 · Every valid Philippine mobile number is accepted
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-010 (developer's answer)
+
+**Decision.**
+- Every valid Philippine mobile number is accepted, including valid numbers that start with 08…. Validity is checked with the `libphonenumber-js` library, with its full metadata.
+- Accepted inputs: the local forms `09…` and `08…`, `9…` and `8…`, `639…` and `638…`, and `+63…`. Spaces and dashes are ignored.
+- Every number is saved in E.164 form: `+63` followed by the 10-digit mobile number.
+- The database keeps a simple format check as a backstop; the app does the real check with the library.
+- This changes [BR-11](../01-requirements/business-rules.md), which accepted only `09…` / `+639…` numbers.
+
+**Options considered.** Keep BR-11 as it was, or accept every valid Philippine mobile number checked by `libphonenumber-js` ([architecture](../05-technical/architecture.md) open question 15).
+
+**Rationale.** Some valid Philippine mobile numbers start with 08…; under the old rule, those customers could not book. The library follows the national number plan, so the system does not track mobile prefixes by hand.
+
+**Docs affected:** [business-rules](../01-requirements/business-rules.md) (BR-11) · [glossary](glossary.md) (E.164) · [data-model](../05-technical/data-model.md) (§5.3, §13) · [api-specification](../05-technical/api-specification.md) (§1.3, §5.2) · [architecture](../05-technical/architecture.md) (open question 15) · [privacy-and-retention](../01-requirements/privacy-and-retention.md) (§3.1) · [booking-and-submission](../03-workflows/booking-and-submission.md) (WF-01B, WF-01C) · [lookup-and-review](../03-workflows/lookup-and-review.md) (WF-03C) · [notifications-and-tracking](../03-workflows/notifications-and-tracking.md) (WF-07D) · [changes-and-expiry](../03-workflows/changes-and-expiry.md) (WF-06E) · [test-plan](../06-delivery/test-plan.md) (TC-DB-33, TC-UT-02) · [project-status](project-status.md) (§4)
+
+---
+
+### D-35 · Prices may be ₱0, and daily stock may be 0
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-011 (developer's answer)
+
+**Decision.**
+- A package price or an add-on price may be ₱0, so free extras are allowed.
+- An add-on's daily stock may be 0. The add-on is then not available: none can be booked while the stock is 0.
+- The valid ranges of the settings stay as the docs propose ([data-model](../05-technical/data-model.md) §7). The developer reviews them later.
+
+**Options considered.** Prices of more than ₱0 (the API specification's draft), or ₱0 allowed; a daily stock of at least 1, or 0 allowed ([administration](../03-workflows/administration.md) open question 13).
+
+**Rationale.** A free extra is a normal offer. A stock of 0 lets an admin stop an add-on for a while without archiving it.
+
+**Docs affected:** [api-specification](../05-technical/api-specification.md) (§5.6, open question 33) · [data-model](../05-technical/data-model.md) (§5.1) · [catalog-and-payments](../02-domain/catalog-and-payments.md) (§1.2) · [administration](../03-workflows/administration.md) (WF-08A, WF-08D, WF-08F, open question 13) · [ux-and-sitemap](../04-design/ux-and-sitemap.md) (§3.2.8, §3.2.9) · [staff-guide](../07-operations/staff-guide.md) (P-21, P-25, open questions B) · [test-plan](../06-delivery/test-plan.md) (TC-DB-99)
+
+---
+
+### D-36 · A forced password change, and moving 2FA alone
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-012 (developer's answer)
+
+**Decision.**
+- **Forced change.** A new or reset password must be changed at the next login, before the admin area opens. Better Auth has no built-in flag for this, so the app keeps its own flag.
+- **Moving 2FA alone.** After logging in with a backup code, an admin may move 2FA to a new phone without the Super Admin. This needs the password and a backup code. It is recorded in the audit log, in the category `security`, and the Super Admin gets an email. When the Super Admin moves his own 2FA, no email is sent.
+
+**Options considered.** (a) No forced change, or a change at the next login. (b) A reset by the Super Admin every time, or a move by the admin alone after a backup-code login.
+
+**Rationale.** (a) A system-made password has been seen by the Super Admin, so the person replaces it with one only they know. (b) An admin with a backup code can get back to work the same day, and the email tells the Super Admin at once if someone else did it.
+
+**Docs affected:** [security](../05-technical/security.md) (§4.1, open questions 4 and 5) · [administration](../03-workflows/administration.md) (WF-09B, WF-09D, WF-09F, WF-09G, open questions 7 and 8) · [staff-guide](../07-operations/staff-guide.md) (§2.1, P-23, P-27, open questions B) · [roles-and-permissions](../01-requirements/roles-and-permissions.md) (§5.1, §5.2) · [functional-requirements](../01-requirements/functional-requirements.md) (FR-ADM-01, FR-ADM-30, FR-NTF-22, new) · [api-specification](../05-technical/api-specification.md) (§1.2, §3.8, §5.7) · [data-model](../05-technical/data-model.md) (§3, §5.19) · [ux-and-sitemap](../04-design/ux-and-sitemap.md) (§2, §3.2.1) · [deployment-and-operations](../07-operations/deployment-and-operations.md) (§7.7) · [test-plan](../06-delivery/test-plan.md) (TC-DB-100, TC-SEC-56, TC-SEC-57)
+
+---
+
+### D-37 · Disabled admin accounts
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-013 (developer's answer)
+
+**Decision.**
+- The Super Admin can re-enable a disabled account.
+- The daily retention job deletes a disabled admin's login details 30 days after the disable: the password hash, the 2FA secrets, the backup codes, and the sessions.
+- The user row is scrubbed and kept, so the audit log and the "received by" line on acknowledgments still name the person.
+- There is no "change role" action.
+
+**Options considered.** (a) Re-enable, or always create a new account. (b) The retention job, or a manual step by the Super Admin. (c) A change-role action, or none.
+
+**Rationale.** (a) A mistaken disable can be undone without a second account for the same person. (b) A job never forgets the 30-day period of [privacy-and-retention](../01-requirements/privacy-and-retention.md) §6.2. (c) With one person per role, a role never needs to change.
+
+**Docs affected:** [administration](../03-workflows/administration.md) (WF-09G, open question 11) · [data-model](../05-technical/data-model.md) (§4, §5.19, §9, open question 8) · [privacy-and-retention](../01-requirements/privacy-and-retention.md) (§6.2) · [roles-and-permissions](../01-requirements/roles-and-permissions.md) (§2.7, §2.8, §5.1) · [functional-requirements](../01-requirements/functional-requirements.md) (FR-ADM-30, FR-SYS-05) · [api-specification](../05-technical/api-specification.md) (§3.8, §5.7, §5.9) · [ux-and-sitemap](../04-design/ux-and-sitemap.md) (§3.2.10) · [staff-guide](../07-operations/staff-guide.md) (P-27) · [edge-cases](../01-requirements/edge-cases.md) (EC-76) · [test-plan](../06-delivery/test-plan.md) (TC-DB-91, TC-DB-101, §3.9)
+
+---
+
+### D-38 · The Foundation baseline
+
+**Date:** 2026-10-21 · **Label:** [C] · **Source:** Project Status Q-014 (developer's answer)
+
+**Decision.** These [P] proposals are accepted as the Foundation baseline and are now confirmed decisions:
+- [architecture](../05-technical/architecture.md) open questions 1, 2, 8, and 10;
+- [data-model](../05-technical/data-model.md) open questions 1 to 5, 7 to 10, and 13;
+- [api-specification](../05-technical/api-specification.md) open questions 1 to 5, 8, and 9;
+- [security](../05-technical/security.md) open questions 1 to 13, 30, and 31;
+- [deployment-and-operations](../07-operations/deployment-and-operations.md) open questions 1 to 11;
+- [roadmap](../06-delivery/roadmap.md) open questions 3, 4, and 10;
+- [test-plan](../06-delivery/test-plan.md) open question 12.
+
+Each one can still change through this log (section 4). Where D-28 or D-36 adds to one of them (deployment-and-operations open question 1; security open questions 4 and 5), the newer decision applies.
+
+**Options considered.** Confirming each proposal one by one in a later review, or accepting the listed set now as the baseline and changing single items later through this log.
+
+**Rationale.** Foundation (the repository, CI, the whole schema, login with 2FA, accounts, and settings) builds on these proposals. Accepting them as one baseline lets Foundation start, and any single item can still change.
+
+**Docs affected:** [architecture](../05-technical/architecture.md) · [data-model](../05-technical/data-model.md) · [api-specification](../05-technical/api-specification.md) · [security](../05-technical/security.md) · [deployment-and-operations](../07-operations/deployment-and-operations.md) · [roadmap](../06-delivery/roadmap.md) · [test-plan](../06-delivery/test-plan.md) (each: a line near the top, and "Accepted (D-38)" on the listed open questions) · [project-status](project-status.md) (§3.1, §3.5)
+
+---
+
 ## 3. Open items
 
 These items still need an answer or an action. The IDs are kept from spec v0.2 §19, written with two digits (spec "O-2" is "O-02" here).
@@ -518,7 +772,7 @@ When an open item is answered, it becomes a decision. Follow section 4.
 
 **Steps.**
 
-1. **Write the new decision here.** Add a new entry with the next free number (D-24, D-25, …). Give the date, the new decision, the options considered, the rationale, and the docs affected.
+1. **Write the new decision here.** Add a new entry with the next free number (D-39, D-40, …). Give the date, the new decision, the options considered, the rationale, and the docs affected.
 2. **Mark the old entry.** Add "Superseded by D-xx on (date)" to the old decision. Do not delete it, and never reuse or renumber an ID. Small wording fixes that do not change the meaning can be edited in place.
 3. **Update every doc in "Docs affected".** Also search all docs for the old decision ID and for the rule it changes, in case another doc mentions it. Run a search for the ID across `docs/` (excluding the frozen spec), and add any doc it finds to "Docs affected".
 4. **Update the label.** A [P] item that is confirmed becomes [C]. A [U] fact that has been checked loses its [U].
@@ -532,6 +786,6 @@ When an open item is answered, it becomes a decision. Follow section 4.
 **Settings.** Many numbers, such as the 24-hour deposit deadline, are stored as settings so they can be changed without new code. A change made in the admin panel's settings is recorded in the audit log. If the new value is meant to become the new standard, also record it here as a decision, so the docs stay true.
 
 *Example.* Suppose the admins later want customers without email to get an SMS. SMS is on the "Later" list, so this changes D-10.
-1. Add D-24: "Send SMS notifications to customers without email", with the date, the options, the rationale, and the docs affected.
-2. Mark D-10 "Superseded by D-24".
-3. Update the docs D-24 lists, for example [functional-requirements](../01-requirements/functional-requirements.md) (FR-NTF-21), [non-functional-requirements](../01-requirements/non-functional-requirements.md) (NFR-01), and the Later list in the [project-charter](project-charter.md).
+1. Add D-39: "Send SMS notifications to customers without email", with the date, the options, the rationale, and the docs affected.
+2. Mark D-10 "Superseded by D-39".
+3. Update the docs D-39 lists, for example [functional-requirements](../01-requirements/functional-requirements.md) (FR-NTF-21), [non-functional-requirements](../01-requirements/non-functional-requirements.md) (NFR-01), and the Later list in the [project-charter](project-charter.md).

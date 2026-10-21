@@ -47,7 +47,7 @@
 | BR-08 | Admins can block a set, the room, or a whole date. A block uses capacity like a booking. | [C] | [D-17](../00-project/decision-log.md) |
 | BR-09 | The public calendar shows only Available or Full, from today through the booking window. | [C]; window [P] | [D-14](../00-project/decision-log.md) |
 | BR-10 | A catalog edit that clashes with future live claims is refused. | — | [D-23](../00-project/decision-log.md) (approved design) |
-| BR-11 | Philippine mobile numbers are accepted in four forms and always saved as `+639XXXXXXXXX`. | — | [D-08](../00-project/decision-log.md) |
+| BR-11 | Every valid Philippine mobile number is accepted and always saved in E.164 form (`+63…`). | [C] | [D-08, D-34](../00-project/decision-log.md) |
 | BR-12 | A proof uploaded before the deposit deadline pauses expiry until an admin reviews it, but never past the service start. | [C]; rejection after the deadline [P] | [D-05](../00-project/decision-log.md) |
 
 ---
@@ -360,18 +360,19 @@ flowchart TD
 
 ### BR-11 · Mobile numbers
 
-**Label:** [C] for the mobile number being required (D-08); the formats are approved design · **Based on:** [D-08](../00-project/decision-log.md)
+**Label:** [C] for the mobile number being required (D-08); the accepted numbers and forms [C] (D-34, which changed this rule on 2026-10-21) · **Based on:** [D-08, D-34](../00-project/decision-log.md)
 
 **Rule.**
-- The mobile number is required, and it must be a Philippine mobile number. Email is optional (D-08).
-- Four forms are accepted. Spaces and dashes are ignored.
-  - `09XXXXXXXXX`
-  - `9XXXXXXXXX`
-  - `639XXXXXXXXX`
-  - `+639XXXXXXXXX`
-- Every number is converted to one standard form, called E.164: `+639XXXXXXXXX`. This happens both in the form and in the database.
+- The mobile number is required, and it must be a valid Philippine mobile number. Email is optional (D-08).
+- Every valid Philippine mobile number is accepted, including valid numbers that start with 08…. Validity is checked with the `libphonenumber-js` library, with its full metadata **[C]** (D-34).
+- These forms are accepted. Spaces and dashes are ignored.
+  - local: `09…` or `08…` (11 digits)
+  - without the leading 0: `9…` or `8…` (10 digits)
+  - with the country code: `639…` or `638…`
+  - international: `+63…`
+- Every number is converted to one standard form, called E.164: `+63` followed by the 10-digit mobile number, for example `+639171234567`. This happens both in the form and in the database. The database keeps only a simple format check as a backstop; the app does the real check with the library.
 - The standard form is what is saved, what the hold limits count (BR-07), and what the status page compares ([functional-requirements](functional-requirements.md) FR-PUB-10).
-- Anything else is rejected.
+- Anything else is rejected: a landline, a number with too few or too many digits, or an 08… number that is not a valid mobile number.
 
 **Examples.**
 
@@ -381,6 +382,8 @@ flowchart TD
 | `917-123-4567` | Saved as `+639171234567` |
 | `63 917 123 4567` | Saved as `+639171234567` |
 | `+63 917 123 4567` | Saved as `+639171234567` |
+| `0895 123 4567` (a valid 08… mobile number) | Saved as `+638951234567` |
+| `0812 345 6789` (not a valid mobile number) | Rejected |
 | `02 8123 4567` (a landline) | Rejected |
 | `0917 123 456` (one digit short) | Rejected |
 
@@ -388,7 +391,7 @@ So a customer who typed `0917 123 4567` when booking can type `+63 917 123 4567`
 
 A wrong number is corrected by an admin with "edit details", with a reason ([reservation-lifecycle](../02-domain/reservation-lifecycle.md) §6.2; [edge-cases](edge-cases.md) EC-46). How long numbers are kept: [privacy-and-retention](privacy-and-retention.md).
 
-**Related:** [D-08](../00-project/decision-log.md) · BR-07 · [reservation-lifecycle](../02-domain/reservation-lifecycle.md) (edit details) · [functional-requirements](functional-requirements.md) FR-PUB-05 (reservation form), FR-PUB-10 (status lookup) · [privacy-and-retention](privacy-and-retention.md) · [glossary](../00-project/glossary.md) (E.164)
+**Related:** [D-08, D-34](../00-project/decision-log.md) · BR-07 · [reservation-lifecycle](../02-domain/reservation-lifecycle.md) (edit details) · [functional-requirements](functional-requirements.md) FR-PUB-05 (reservation form), FR-PUB-10 (status lookup) · [privacy-and-retention](privacy-and-retention.md) · [glossary](../00-project/glossary.md) (E.164)
 
 ---
 

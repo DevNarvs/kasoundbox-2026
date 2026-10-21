@@ -628,7 +628,7 @@ flowchart TD
     L1["Customer opens<br/>the status page"] --> L2["Types the reference code<br/>and the full mobile number"]
     L2 --> D1{"Mobile in an<br/>accepted format?"}
     D1 -->|"No"| X1["Message: enter a<br/>Philippine mobile number"]
-    D1 -->|"Yes"| L3["Code uppercased, spaces and<br/>dashes ignored, mobile to +639"]
+    D1 -->|"Yes"| L3["Code uppercased, spaces and<br/>dashes ignored, mobile to +63"]
     L3 --> D2{"Under the lookup<br/>rate limits?"}
     D2 -->|"No"| X2["Refused for a while"]
     D2 -->|"Yes"| D3{"Both match the<br/>same reservation?"}

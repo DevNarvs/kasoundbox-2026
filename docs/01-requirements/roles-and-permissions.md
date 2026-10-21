@@ -105,7 +105,7 @@ This is the full matrix. It extends the confirmed role split in D-07 and D-17 wi
 | Action | Super Admin | Admin | Label | Rule details in |
 |---|---|---|---|---|
 | Change the **reserved settings**: deposit amount, deadlines (72 hours to review, 24 hours to pay the deposit), delivery slots, business info | ✓ | — | [C] D-07 | Deadlines: [reservation-lifecycle](../02-domain/reservation-lifecycle.md); deposit and slots: [catalog-and-payments](../02-domain/catalog-and-payments.md); settings screens: [functional-requirements](functional-requirements.md) (FR-ADM-28) |
-| Change the **other settings**: notice period, on-site hours, booking window, hold limits and breaker, reminder lead time, email caps (including the admin reserve), maximum email send attempts ², rate-limit thresholds, retention periods, issuer name, deposit instructions, deposit terms text | ✓ | — | [P] | [functional-requirements](functional-requirements.md) (FR-ADM-28); each rule in its owning doc: [business-rules](business-rules.md), [functional-requirements](functional-requirements.md) (FR-NTF-04, FR-NTF-18, FR-NTF-20), [non-functional-requirements](non-functional-requirements.md) (NFR-11), [privacy-and-retention](privacy-and-retention.md), [catalog-and-payments](../02-domain/catalog-and-payments.md) |
+| Change the **other settings**: notice period, on-site hours, booking window, hold limits and breaker, reminder lead time, email caps (including the admin reserve), maximum email send attempts ², rate-limit thresholds, retention periods, issuer name, deposit instructions, deposit terms text, and the pre-launch switch that opens online booking (`public_booking_open`, **[C]** [D-30](../00-project/decision-log.md)) | ✓ | — | [P]; the pre-launch switch [C] | [functional-requirements](functional-requirements.md) (FR-ADM-28, FR-ADM-34); each rule in its owning doc: [business-rules](business-rules.md), [functional-requirements](functional-requirements.md) (FR-NTF-04, FR-NTF-18, FR-NTF-20), [non-functional-requirements](non-functional-requirements.md) (NFR-11), [privacy-and-retention](privacy-and-retention.md), [catalog-and-payments](../02-domain/catalog-and-payments.md) |
 
 ² Spec v0.2 §11 lists the maximum number of send attempts as a notification setting, but the §4 matrix does not name it. It is treated as one of the other settings: Super Admin only **[P]**.
 
@@ -117,7 +117,7 @@ The one exception: either admin may end a breaker pause early (section 2.4).
 |---|---|---|---|---|
 | Set a legal hold on a reservation (with a reason), or clear it ³ | ✓ | — | [P] | [privacy-and-retention](privacy-and-retention.md) (legal hold) |
 | Process a customer's erasure request | ✓ | — | [P] | [privacy-and-retention](privacy-and-retention.md) (erasure) |
-| Manage admin accounts: create, disable, reset, sign out | ✓ | — | [C] D-07 | Section 5 of this document |
+| Manage admin accounts: create, disable, re-enable, reset, sign out | ✓ | — | [C] D-07; re-enable [C] D-37 | Section 5 of this document |
 
 ³ Spec v0.2 §14 requires a reason to set a legal hold. A reason to clear it is **[P] (new in [privacy-and-retention](privacy-and-retention.md) §5.6)**, to be confirmed in review.
 
@@ -131,7 +131,7 @@ Ask the Super Admin when you need to:
 - change the deposit amount, a deadline, a delivery slot, the business info, or any other setting;
 - add, rename, or deactivate a delivery set or the room;
 - set or clear a legal hold, or handle a customer's request to erase their data;
-- create, disable, or reset an admin account.
+- create, disable, re-enable, or reset an admin account.
 
 ## 3. Customers
 
@@ -186,8 +186,10 @@ These rules are **[P]** unless marked otherwise. They come from spec v0.2 §4 an
 - **Two accounts at most.** There is at most one Super Admin and one active Admin. The two roles are **[C]** (D-07); the limits in this section are **[P]**. There is no public sign-up. The first accounts are created by a setup script. After that, only the Super Admin can create an Admin account (see below).
 - **Login.** Each admin logs in with an email address and a password, then a code from an authenticator app on their phone. This second step (two-factor authentication, 2FA) is required before the admin area opens. Login limits, such as the lockout after repeated failures, are in [non-functional-requirements](non-functional-requirements.md) (NFR-09, NFR-11).
 - **Creating an Admin.** The Super Admin can create an Admin only when no Admin is active.
-- **The Super Admin protects itself.** The Super Admin cannot disable or demote its own account.
-- **Disable.** The Super Admin disables the account of a person who stops being an admin, so they can no longer log in. How soon this must happen, and how long their account data is kept, is in [privacy-and-retention](privacy-and-retention.md).
+- **The Super Admin protects itself.** The Super Admin cannot disable its own account. There is no "change role" action at all **[C]** ([D-37](../00-project/decision-log.md)).
+- **Disable.** The Super Admin disables the account of a person who stops being an admin, so they can no longer log in. How soon this must happen, and how long their account data is kept, is in [privacy-and-retention](privacy-and-retention.md): the daily retention job deletes the login details when that period ends (30 days after the disable), and the account itself is kept with only the name, so the history and "received by" still show who it was **[C]** ([D-37](../00-project/decision-log.md)).
+- **Re-enable.** The Super Admin can re-enable a disabled account, as long as no other account of that role is active **[C]** ([D-37](../00-project/decision-log.md)).
+- **New and reset passwords** must be changed at the next login, before the admin area opens **[C]** ([D-36](../00-project/decision-log.md)).
 - **Reset.** A reset sets a new password, forces the person to set up 2FA again, and signs that person out everywhere (ends all of their sessions).
 - **Sign out.** The Super Admin can end an admin's sessions, for example after a phone or laptop is lost.
 - **Every account action is recorded** in the audit log.
@@ -203,8 +205,8 @@ These rules are **[P]** unless marked otherwise. They come from spec v0.2 §4 an
 
 | Who | What to do |
 |---|---|
-| **Admin** (the business owner) | Log in with one of your backup codes. If you have none left, ask the Super Admin to reset your account. You get a new password, set up 2FA again on your new phone, and are signed out everywhere else. |
-| **Super Admin** (the developer) | Log in with one of your backup codes. If you have none left, run the break-glass script with the database credentials. It resets your 2FA and records this in the audit log. |
+| **Admin** (the business owner) | Log in with one of your backup codes. Then you can move 2FA to your new phone yourself, with your password and a backup code; this is recorded, and the Super Admin gets an email **[C]** ([D-36](../00-project/decision-log.md)). If you have no backup codes left, ask the Super Admin to reset your account. You get a new password, change it at your next login, set up 2FA again on your new phone, and are signed out everywhere else. |
+| **Super Admin** (the developer) | Log in with one of your backup codes, then move 2FA to your new phone yourself, as above, with no email ([D-36](../00-project/decision-log.md)). If you have none left, run the break-glass script with the database credentials. It resets your 2FA and records this in the audit log. |
 
 ## 6. What personal data each role sees
 

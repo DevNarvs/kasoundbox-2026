@@ -180,7 +180,7 @@ sequenceDiagram
 | Decision | Yes | No | Rule |
 |---|---|---|---|
 | Logged in with 2FA, and the role allows it? | Continue | Refused by the server | [roles §2.5, §7][roles], [NFR-10][nfr], [EC-73][ec] |
-| Input valid, in the app and in the database? | Continue | Error shown; nothing saved. Which values are valid is open question 13 | [NFR-21][nfr] |
+| Input valid, in the app and in the database? | Continue | Error shown; nothing saved. A price may be ₱0 and a daily stock 0 **[C]** ([D-35][dl]); the other bounds are in the [data model][data] | [NFR-21][nfr] |
 | A new daily stock for an existing add-on? | WF-08B | Continue | [BR-10][br] |
 | Does a price change clash with existing bookings? | Never: each keeps its snapshot | — | [BR-10][br], [D-12][dl] |
 
@@ -494,7 +494,7 @@ No separate diagram: the parties are the Super Admin's browser, the Next.js serv
 | Logged in with 2FA as the Super Admin? | Continue | Refused by the server | [roles §2.6][roles], [EC-74][ec] |
 | Archive: does a live reservation use the slot? | Refused; listed | Archive | [BR-10][br], [EC-58][ec] |
 | Change of times: does it move existing bookings? | Never | — | [BR-10][br], [EC-56][ec] |
-| Valid times (for example, start before end)? | Continue | Error; open question 13 | [NFR-21][nfr] |
+| Valid times (for example, start before end)? | Continue | Error; the bounds in the [data model][data] ([D-35][dl]) | [NFR-21][nfr] |
 
 ### Failure and exception paths
 
@@ -706,7 +706,7 @@ sequenceDiagram
 | 1 | Super Admin | Opens the settings and changes one value. | Read: settings | [FR-ADM-28][fr] |
 | 2 | Next.js server | Checks the login, 2FA, and role: only the roles allowed in [roles §2.6][roles] can save each setting. The Admin is refused. | Read: session | [roles §2.6][roles], [FR-ADM-28][fr], [EC-74][ec] |
 | 3 | Next.js server | The online-booking pause time is not offered for editing: only the breaker sets it and only "resume early" clears it (WF-08G). | — | [FR-ADM-28][fr], [BR-07a][br] |
-| 4 | Next.js server, database | Validates the value in the app and again in the database. Which values are valid is open question 13. | — | [NFR-21][nfr] |
+| 4 | Next.js server, database | Validates the value in the app and again in the database. The valid ranges are those proposed in the [data model][data], kept until the developer reviews them **[C]** ([D-35][dl]). | — | [NFR-21][nfr] |
 | 5 | Database | Saves the setting. No reservation is changed: locked prices and deposit, stored service start, and stored deadlines stay as they were. | Update: setting | [FR-ADM-28][fr], [catalog-and-payments §2.2][cat], [reservation-lifecycle §3.2, §8][lc], [EC-55][ec], [EC-56][ec] |
 | 6 | Database | Writes the audit entry in the `settings` category: which setting, who, and when. The entry stores the setting's name, not the old or new value. | Create: audit entry | [FR-ADM-28][fr], [FR-ADM-32][fr], WF-10A |
 | 7 | System (later) | The next action or job run uses the new value. For example: the next submission locks the new deposit; the next retention run uses a new retention period; the next login attempt uses a new rate limit. | Read: setting | [catalog-and-payments §2.2][cat], [FR-SYS-05][fr], [NFR-11][nfr] |
@@ -718,7 +718,7 @@ sequenceDiagram
 |---|---|---|---|
 | Logged in with 2FA as the Super Admin? | Continue | Refused by the server | [roles §2.6][roles], [EC-74][ec] |
 | Is it the online-booking pause time? | Not editable here; WF-08G | Continue | [FR-ADM-28][fr] |
-| Value valid? | Save | Error; open question 13 | [NFR-21][nfr] |
+| Value valid? | Save | Error; the ranges of the [data model][data] ([D-35][dl]) | [NFR-21][nfr] |
 | Meant as the new standard? | Also record in the decision log | Done | [decision-log §4][dl] |
 
 ### Failure and exception paths
@@ -739,7 +739,7 @@ None. A setting change never changes a reservation ([FR-ADM-28][fr]).
 
 ### Developer notes
 
-- **Database function:** `app.update_setting(key, value)`, with one validator per key (types and ranges: open question 13). It checks the acting admin's role again (WF-09C step 9).
+- **Database function:** `app.update_setting(key, value)`, with one validator per key (types and ranges as the data model proposes, [D-35][dl]). It checks the acting admin's role again (WF-09C step 9).
 - **Server action:** `updateSettingAction` in the settings part of the admin module tree.
 - **Audit:** category `settings`, action `setting.updated`, changed field = the setting key (for example `deposit_amount`), never the value.
 - **Outbox:** none.
@@ -1262,7 +1262,7 @@ None. Login changes no reservation. Account states (active, locked, disabled) ar
 
 ### In plain words
 
-Before an account can open the admin area for the first time, its owner sets up two-factor login: they add the account to an authenticator app on their own phone. The system then gives them a set of one-time backup codes, which they print or write down and keep somewhere safe at home, away from the phone. The same setup happens again after the Super Admin resets an account, and after the break-glass script. *Example:* on Monday 4 January 2027, the new Admin logs in for the first time, adds the account to the authenticator app on his phone, prints his backup codes, and puts them in a drawer at home ([roles §5.2][roles]).
+Before an account can open the admin area for the first time, its owner sets up two-factor login: they add the account to an authenticator app on their own phone. The system then gives them a set of one-time backup codes, which they print or write down and keep somewhere safe at home, away from the phone. The same setup happens again after the Super Admin resets an account, and after the break-glass script. A new or reset password is changed first, at that login **[C]** ([D-36][dl]). *Example:* on Monday 4 January 2027, the new Admin logs in for the first time, adds the account to the authenticator app on his phone, prints his backup codes, and puts them in a drawer at home ([roles §5.2][roles]).
 
 ### Actors and responsibilities
 
@@ -1281,7 +1281,8 @@ Before an account can open the admin area for the first time, its owner sets up 
 
 ```mermaid
 flowchart TD
-    A["Password right, but no 2FA yet:<br/>new account, reset, or break-glass"] --> B["Server shows a setup code<br/>for the authenticator app"]
+    A["Password right, but no 2FA yet:<br/>new account, reset, or break-glass"] --> PW["New or reset password:<br/>admin picks a new one first, D-36"]
+    PW --> B["Server shows a setup code<br/>for the authenticator app"]
     B --> C["Admin adds it to the app<br/>on their own phone"]
     C --> D["Admin types the first code<br/>from the app: [P] new in this doc"]
     D --> V{"Code right?"}
@@ -1296,7 +1297,7 @@ flowchart TD
     classDef admin fill:#fff3e0,stroke:#ef6c00,color:#e65100
     classDef status fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
-    class C,D,H admin
+    class C,D,H,PW admin
     class A,B,V,G,AU system
     class I status
     class VF failure
@@ -1311,11 +1312,12 @@ No separate diagram: the parties are the admin's browser, the Next.js server wit
 | Step | Actor | What happens | Data created, updated, or read | Rules and requirements |
 |---|---|---|---|---|
 | 1 | Better Auth | After a right password, sees that the account has no 2FA. The admin area stays closed. | Read: account | [FR-ADM-01][fr], [roles §5.1][roles] |
+| 1a | Admin, Next.js server | If the password is new or was reset (the app's `must_change_password` flag), the admin first chooses a new password; only then does the setup go on **[C]** ([D-36][dl]). | Update: password hash; the flag cleared | [FR-ADM-01][fr], [roles §5.1][roles] |
 | 2 | Better Auth | Shows a setup code (usually a QR picture) to add to an authenticator app. | Create: 2FA secret, not yet active | [FR-ADM-01][fr], [NFR-09][nfr] |
 | 3 | Admin | Adds it to the authenticator app on their own phone. | — | [roles §5.1][roles] |
 | 4 | Admin | Types the first code from the app, to prove the setup works **[P] (new in this doc)**, open question 7. | — | — |
 | 5 | Better Auth | Wrong code: not set up; the admin tries again. Right code: 2FA is on. | Update: 2FA state | [FR-ADM-01][fr] |
-| 6 | Better Auth | Makes a set of one-time backup codes and shows them. How many, and whether they can be made again, is open question 7. | Create: backup codes | [roles §5.2][roles], [FR-ADM-01][fr] |
+| 6 | Better Auth | Makes a set of ten one-time backup codes and shows them once. A new set needs the password and a current code, and ends the old set ([security][sec] §4.1, accepted in [D-38][dl]). | Create: backup codes | [roles §5.2][roles], [FR-ADM-01][fr] |
 | 7 | Admin | Stores the codes offline, for example printed and kept in a safe place at home. | — | [roles §5.2][roles] |
 | 8 | Database | Writes the audit entry. This document reads 2FA setup as an account change, so the category is `account` ([FR-ADM-01][fr]); see open question 1. | Create: audit entry | [FR-ADM-01][fr], [FR-ADM-30][fr], WF-10A |
 | 9 | Better Auth | Creates the session; the admin area opens (as WF-09A step 9). | Create: session | [FR-ADM-01][fr] |
@@ -1332,7 +1334,7 @@ No separate diagram: the parties are the admin's browser, the Next.js server wit
 | Situation | What happens | Edge case |
 |---|---|---|
 | The admin closes the page before finishing | The admin area never opened; next login starts the setup again ([FR-ADM-01][fr]) | — |
-| The backup codes are lost later, while the phone still works | Not settled: whether codes can be shown again or replaced is open question 7 | — |
+| The backup codes are lost later, while the phone still works | They are never shown again; the admin makes a new set with the password and a current code, which ends the old set ([security][sec] §4.1, [D-38][dl]) | — |
 | The phone is lost later | WF-09D | [EC-71][ec] |
 
 ### Status transitions involved
@@ -1342,7 +1344,7 @@ None.
 ### Developer notes
 
 - **Library:** the Better Auth two-factor plugin (TOTP enrolment and backup codes).
-- **Storage:** the 2FA secret and backup codes are admin account data, kept while the person is an admin and deleted with the credentials ([privacy-and-retention §6.2][priv]). Storing backup codes only as hashes follows [NFR-13][nfr] ("hashed where stored"); confirm in the security doc (planned: `05-technical/security.md`).
+- **Storage:** the 2FA secret and backup codes are admin account data, kept while the person is an admin and deleted with the credentials ([privacy-and-retention §6.2][priv]). Backup codes are stored encrypted rather than hashed, which meets the aim of [NFR-13][nfr] ("hashed where stored") ([security][sec] §4.1, accepted in [D-38][dl]). The `must_change_password` flag is the app's own column on the user row ([data-model][data] §5.19; [D-36][dl]).
 - **Audit:** category `account`, action `account.2fa_enabled`. **Outbox:** none.
 
 *(indicative; final names in api-specification, batch 3)*
@@ -1479,7 +1481,7 @@ None of its own. The action that passes the check makes its own transitions (WF-
 
 ### In plain words
 
-If an admin loses the phone that has the authenticator app, they log in with one of the backup codes they stored at setup; each code works only once. If the Admin (the business owner) has no codes left, he asks the Super Admin to reset his account: he gets a new password, sets up 2FA again on his new phone, and is signed out everywhere else. If the Super Admin (the developer) has no codes left, he runs the break-glass script (WF-09E). The Super Admin can also sign out the lost phone's sessions, so whoever finds it cannot use the admin panel. *Example:* on Saturday 2 January 2027, the Admin's phone is stolen. He has used all his backup codes. He calls his son, the Super Admin, who first signs out his sessions and then resets his account; the Admin sets up 2FA on his new phone that afternoon ([EC-71][ec]).
+If an admin loses the phone that has the authenticator app, they log in with one of the backup codes they stored at setup; each code works only once. Then they can move 2FA to the new phone themselves, with the password and a backup code; this is recorded, and the Super Admin gets an email, unless it is his own account **[C]** ([D-36][dl]). If the Admin (the business owner) has no codes left, he asks the Super Admin to reset his account: he gets a new password, sets up 2FA again on his new phone, and is signed out everywhere else. If the Super Admin (the developer) has no codes left, he runs the break-glass script (WF-09E). The Super Admin can also sign out the lost phone's sessions, so whoever finds it cannot use the admin panel. *Example:* on Saturday 2 January 2027, the Admin's phone is stolen. He has used all his backup codes. He calls his son, the Super Admin, who first signs out his sessions and then resets his account; the Admin sets up 2FA on his new phone that afternoon ([EC-71][ec]).
 
 ### Actors and responsibilities
 
@@ -1492,7 +1494,7 @@ If an admin loses the phone that has the authenticator app, they log in with one
 ### Trigger and preconditions
 
 - **Trigger:** the phone with the authenticator app is lost, stolen, or broken.
-- **Preconditions:** the person still knows their password. A forgotten password is open question 8.
+- **Preconditions:** the person still knows their password. A forgotten password: the Super Admin resets the Admin's account (WF-09G), and the break-glass script can set a new one for the Super Admin ([security][sec] §4.1, accepted in [D-38][dl]).
 
 ### Flowchart
 
@@ -1502,7 +1504,7 @@ flowchart TD
     SO --> B{"A backup code left?"}
     B -->|"Yes"| C["Log in with the password<br/>and one backup code"]
     C --> C1["That code never<br/>works again"]
-    C1 --> C2["Moving 2FA to the new phone:<br/>open question 7"]
+    C1 --> C2["Moves 2FA to the new phone alone:<br/>password and a backup code, D-36"]
     B -->|"No"| W{"Whose phone?"}
     W -->|"The Admin's"| R["Admin asks the Super Admin<br/>for a reset: WF-09G"]
     R --> R1["New password, 2FA set up<br/>on the new phone, all sessions ended"]
@@ -1530,7 +1532,7 @@ No separate diagram: this sub-flow is a choice between WF-09A (with a backup cod
 | 1 | Admin | Loses the phone with the authenticator app. | — | [EC-71][ec] |
 | 2 | Super Admin | May sign out the lost phone's sessions at once (WF-09G), for example after a phone or laptop is lost. Whether one session or all are ended is open question 10. | Delete: sessions | [roles §5.1][roles], [EC-71][ec] |
 | 3 | Admin | If a backup code is left: logs in with the password and one backup code (WF-09A steps 3 to 9). That code never works again. | Update: backup code used | [roles §5.2][roles], [glossary][gl] (backup codes) |
-| 4 | Admin | Whether the admin can then move 2FA to a new phone alone, or needs a reset, is open question 7. | — | — |
+| 4 | Admin | May then move 2FA to the new phone alone, with the password and a backup code, and the first code from the new phone. The old 2FA stops working. The change is recorded in the `security` category, and the Super Admin gets an email; when the Super Admin moves his own, no email is sent **[C]** ([D-36][dl]). | Update: 2FA secret, backup codes; create: audit entry, outbox row | [FR-ADM-30][fr], [FR-NTF-22][fr] |
 | 5 | Admin (the business owner) | No codes left: asks the Super Admin to reset the account (WF-09G). He gets a new password, sets up 2FA again on his new phone (WF-09B), and is signed out everywhere. | See WF-09G | [roles §5.2][roles], [EC-71][ec] |
 | 6 | Super Admin (the developer) | No codes left for his own account: runs the break-glass script (WF-09E). | See WF-09E | [roles §5.2][roles], [EC-71][ec] |
 
@@ -1547,7 +1549,7 @@ No separate diagram: this sub-flow is a choice between WF-09A (with a backup cod
 |---|---|---|
 | The lost phone is still logged in | The Super Admin signs out its sessions | [EC-71][ec] |
 | A backup code is typed a second time | Refused: each code works once | [EC-71][ec] |
-| The password is also forgotten | Not settled: open question 8 | — |
+| The password is also forgotten | The Admin: a reset by the Super Admin (WF-09G). The Super Admin: the break-glass script sets a new password ([security][sec] §4.1, [D-38][dl]) | — |
 
 ### Status transitions involved
 
@@ -1556,7 +1558,7 @@ None.
 ### Developer notes
 
 - **Backup codes:** the Better Auth two-factor plugin marks a used code so it cannot be used again.
-- **Audit:** the reset and sign-out are `account` entries (WF-09G). Whether using a backup code is recorded is open question 3.
+- **Audit:** the reset and sign-out are `account` entries (WF-09G). Moving 2FA writes a `security` entry, `account.2fa_moved`, and queues the email to the Super Admin ([D-36][dl]). Whether using a backup code is recorded is open question 3.
 
 *(indicative; final names in api-specification, batch 3)*
 
@@ -1674,7 +1676,7 @@ There is at most one Super Admin and one active Admin, and nobody can sign up. T
 
 | Actor | Responsibilities in this sub-flow |
 |---|---|
-| Super Admin | Creates the Admin account ([roles §2.7][roles]). Gives the person their first password (how: open question 8). |
+| Super Admin | Creates the Admin account ([roles §2.7][roles]). Gives the person their first password in person; the person changes it at the first login ([D-36][dl]). |
 | Next.js server | Checks the login, 2FA, and role: Super Admin only (WF-09C). |
 | Postgres function | Checks that no Admin is active, creates the account with the Admin role, and writes the audit entry ([roles §5.1][roles], [FR-ADM-30][fr]). |
 | The new Admin | Logs in and sets up 2FA (WF-09A, WF-09B). |
@@ -1695,7 +1697,7 @@ flowchart TD
     C -->|"No"| D["Super Admin enters the name,<br/>email, and first password"]
     D --> E["Account created with the Admin role<br/>password stored only as a hash"]
     E --> AU["Audit entry: account"]
-    AU --> F["Password handed to the person<br/>how: open question 8"]
+    AU --> F["Password handed over in person<br/>changed at first login, D-36"]
     F --> G["New Admin logs in and<br/>sets up 2FA: WF-09B"]
     classDef customer fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
     classDef system fill:#f5f5f5,stroke:#616161,color:#212121
@@ -1722,7 +1724,7 @@ No separate diagram: the parties are the Super Admin's browser, the Next.js serv
 | 4 | Super Admin | Enters the person's name and email address, and a first password. | — | [roles §5.1][roles], [privacy-and-retention §3.1][priv] (admin account data) |
 | 5 | Database | Creates the account with the Admin role. The password is stored only as an argon2id hash. The account has no 2FA yet. | Create: user, account | [NFR-09][nfr], [roles §7][roles] |
 | 6 | Database | Writes the audit entry, category `account`. | Create: audit entry | [FR-ADM-30][fr], [roles §5.1][roles] |
-| 7 | Super Admin | Hands the first password to the person. How, and whether it must be changed at first login, is open question 8. | — | — |
+| 7 | Super Admin | Hands the first password to the person, in person ([security][sec] §4.1, accepted in [D-38][dl]). The person must change it at the first login **[C]** ([D-36][dl]). | — | [roles §5.1][roles] |
 | 8 | New Admin | Logs in (WF-09A) and sets up 2FA (WF-09B) before the admin area opens. | See WF-09A, WF-09B | [FR-ADM-01][fr] |
 
 ### Decision points and validation
@@ -1738,7 +1740,7 @@ No separate diagram: the parties are the Super Admin's browser, the Next.js serv
 |---|---|---|
 | The Super Admin tries to create a second Admin while one is active | Refused | [EC-75][ec] |
 | The Admin tries to create an account | Refused by the server | [EC-74][ec] |
-| A disabled former Admin comes back | Not settled: open question 11 | — |
+| A disabled former Admin comes back | The Super Admin re-enables the account (WF-09G), if no other Admin is active **[C]** ([D-37][dl]) | — |
 
 ### Status transitions involved
 
@@ -1758,7 +1760,7 @@ None.
 
 ### In plain words
 
-The Super Admin has three tools for the other admin account. **Disable** stops a person from logging in at all, for example when they stop being an admin; it is done the same day they leave, and their login details are deleted within a set time (30 days, [privacy-and-retention §6.2][priv]). **Reset** gives the person a new password, makes them set up 2FA again, and signs them out everywhere. **Sign out** ends their sessions, for example after a phone or laptop is lost. The Super Admin can never disable or demote his own account. Every one of these actions is recorded in the audit log. *Example:* on Saturday 2 January 2027 the Admin's phone is stolen and he has no backup codes left. The Super Admin signs out his sessions at once, then resets his account; the Admin sets up 2FA on his new phone ([roles §5.1][roles], [EC-71][ec]).
+The Super Admin has three tools for the other admin account. **Disable** stops a person from logging in at all, for example when they stop being an admin; it is done the same day they leave, and their login details are deleted within a set time (30 days, [privacy-and-retention §6.2][priv]). **Reset** gives the person a new password, makes them set up 2FA again, and signs them out everywhere. **Sign out** ends their sessions, for example after a phone or laptop is lost. The Super Admin can never disable his own account, and there is no "change role" action. He can also **re-enable** a disabled account **[C]** ([D-37][dl]). Every one of these actions is recorded in the audit log. *Example:* on Saturday 2 January 2027 the Admin's phone is stolen and he has no backup codes left. The Super Admin signs out his sessions at once, then resets his account; the Admin sets up 2FA on his new phone ([roles §5.1][roles], [EC-71][ec]).
 
 ### Actors and responsibilities
 
@@ -1784,13 +1786,15 @@ flowchart TD
     K -->|"Disable"| D{"Own account?"}
     D -->|"Yes"| DF["Refused: the Super Admin<br/>cannot disable itself"]
     D -->|"No"| D1["Account disabled: no more logins<br/>sessions ended: [P] new in this doc"]
-    D1 --> D2["Credentials deleted within 30 days<br/>ID and display name stay in audit"]
+    D1 --> D2["Retention job deletes login details<br/>30 days later; user row kept, D-37"]
+    K -->|"Re-enable"| E1["Account active again<br/>if no other Admin is active, D-37"]
     K -->|"Reset"| R1["New password, 2FA must be<br/>set up again, all sessions ended"]
     R1 --> R2["Person logs in and<br/>sets up 2FA: WF-09B"]
     K -->|"Sign out"| S1["That person's sessions end<br/>all or one: open question 10"]
     D1 --> AU["Audit entry: account"]
     R1 --> AU
     S1 --> AU
+    E1 --> AU
     AU --> N["Next request from an ended<br/>session is refused: WF-09C"]
     classDef customer fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
     classDef system fill:#f5f5f5,stroke:#616161,color:#212121
@@ -1799,7 +1803,7 @@ flowchart TD
     classDef failure fill:#ffebee,stroke:#c62828,color:#b71c1c
     class A,R2 admin
     class B,K,D,D2,AU,N system
-    class D1,R1,S1 status
+    class D1,R1,S1,E1 status
     class BF,DF failure
 ```
 
@@ -1834,9 +1838,10 @@ sequenceDiagram
 | 2 | Next.js server | Checks the login, 2FA, and role: Super Admin only (WF-09C). | Read: session | [roles §2.7][roles], [EC-74][ec] |
 | 3 | Database | **Disable:** refuses if it is the Super Admin's own account. | Read: account | [roles §5.1][roles], [EC-75][ec] |
 | 4 | Database | **Disable:** marks the account disabled; the person can no longer log in (WF-09A step 5). It also ends all their sessions at once **[P] (new in this doc)**, open question 4. This is done the same day the person stops being an admin. | Update: account; delete: sessions | [roles §5.1][roles], [privacy-and-retention §6.2][priv], [EC-76][ec] |
-| 5 | System or Super Admin | Within 30 days of leaving, the person's login credentials (password hash, 2FA secret, backup codes) are deleted. Only their ID and display name stay, inside the audit entries that are still kept. Who or what deletes them is open question 11. | Delete: credentials | [privacy-and-retention §6.2][priv], [EC-76][ec] |
+| 5 | System (the daily retention job) | 30 days after the disable, the job deletes the person's login details (password hash, 2FA secret, backup codes, sessions). The user row is scrubbed and kept, so the audit entries and "received by" still name the person **[C]** ([D-37][dl]; WF-10E). | Delete: credentials; update: user row | [privacy-and-retention §6.2][priv], [EC-76][ec] |
+| 5a | Database | **Re-enable:** clears the disable, if no other account of that role is active. If the login details were already deleted, the Super Admin also gives the email and a new password, and the person sets up 2FA again **[C]** ([D-37][dl]). | Update: account | [roles §5.1][roles], [FR-ADM-30][fr] |
 | 6 | Database | **Reset:** sets a new password, removes the 2FA so it must be set up again, and ends all of that person's sessions. | Update: password hash, 2FA; delete: sessions | [roles §5.1][roles], [FR-ADM-30][fr], [NFR-09][nfr] |
-| 7 | Super Admin, then the person | Hands over the new password (how: open question 8). The person logs in and sets up 2FA on their phone (WF-09A, WF-09B). | — | [roles §5.2][roles] |
+| 7 | Super Admin, then the person | Hands over the new password in person ([security][sec] §4.1, [D-38][dl]). The person logs in, changes the password ([D-36][dl]), and sets up 2FA on their phone (WF-09A, WF-09B). | — | [roles §5.2][roles] |
 | 8 | Database | **Sign out:** ends that admin's sessions, for example after a phone or laptop is lost. Whether one session can be picked is open question 10. | Delete: sessions | [roles §5.1][roles], [EC-71][ec] |
 | 9 | Database | For each action, writes the audit entry, category `account`. | Create: audit entry | [FR-ADM-30][fr], [roles §5.1][roles] |
 | 10 | Next.js server (later) | The next request from an ended session finds no session and is refused (WF-09C step 3). | Read: session | [NFR-09][nfr], [roles §7][roles] |
@@ -1853,10 +1858,10 @@ sequenceDiagram
 | Situation | What happens | Edge case |
 |---|---|---|
 | The Super Admin tries to disable or demote his own account | Refused | [EC-75][ec] |
-| A person stops being an admin | Disabled the same day; credentials deleted within 30 days | [EC-76][ec] |
+| A person stops being an admin | Disabled the same day; the retention job deletes the login details 30 days later ([D-37][dl]) | [EC-76][ec] |
 | An admin loses a 2FA phone | Sign out and reset (this sub-flow), or a backup code (WF-09D) | [EC-71][ec] |
 | The Admin tries any account action | Refused by the server | [EC-74][ec] |
-| A disabled account should come back | Not settled: open question 11 | — |
+| A disabled account should come back | Re-enable (step 5a) **[C]** ([D-37][dl]) | — |
 
 ### Status transitions involved
 
@@ -1867,7 +1872,7 @@ None for reservations. The account becomes disabled, or its password, 2FA, and s
 - **Functions:** the Better Auth admin plugin's ban (disable), set-password, and revoke-sessions calls, each wrapped with the matching audit row; or `app.disable_admin`, `app.reset_admin`, `app.sign_out_admin`.
 - **Server actions:** `disableAdminAction`, `resetAdminAction`, `signOutAdminAction`, Super Admin only; each refuses when the target is the acting Super Admin where the rule says so.
 - **Audit:** category `account`; actions `account.disabled`, `account.reset`, `account.signed_out`. **Outbox:** none.
-- **Credential deletion:** open question 11; if it is a job, it fits the daily retention job (WF-10E).
+- **Credential deletion:** the daily retention job (WF-10E), 30 days after the disable **[C]** ([D-37][dl]). **Re-enable:** `reenableAdminAccount` → `app.reenable_admin` ([api-specification][api] §3.8).
 
 *(indicative; final names in api-specification, batch 3)*
 
@@ -2466,7 +2471,7 @@ sequenceDiagram
 | 7 | Database | **Booking audit entries:** for each reservation past its ledger end, adds its entries to monthly per-action counts in the retention run log, then deletes them. | Create: counts; delete: audit entries | [privacy-and-retention §6.2][priv] |
 | 8 | Database | **Security audit entries:** deletes those past their rolling period. | Delete: audit entries | [privacy-and-retention §6.2][priv] |
 | 9 | Database | **Short-lived data:** deletes rate-limit counters and duplicate-submission keys past their period. (The daily rotation of the IP key is its own job, [FR-SYS-06][fr].) | Delete: counters, keys | [privacy-and-retention §6.2][priv], [FR-SYS-05][fr] |
-| 10 | Database | **No rule yet:** catalog, settings, and account audit entries ([privacy-and-retention §11][priv], question 2); outbox rows (question 3); a former admin's credentials (open question 11). | — | [privacy-and-retention §11][priv] |
+| 10 | Database | **Admin login details:** deletes a disabled admin's password hash, 2FA secret, backup codes, and sessions 30 days after the disable, and scrubs the user row, which is kept **[C]** ([D-37][dl]). **No rule yet:** catalog, settings, and account audit entries ([privacy-and-retention §11][priv], question 2); outbox rows (question 3). | Delete: credentials; update: user row | [privacy-and-retention §6.2, §11][priv] |
 | 11 | Database | Writes the retention run log: the date and counts per category, never personal data. Run logs are kept until ledger end (which ledger end: [privacy-and-retention §11][priv], question 11). | Create: retention run | [FR-SYS-05][fr], [privacy-and-retention §6.2, §6.4][priv] |
 | 12 | Database | Writes the job run record. The health panel shows the last run; if the records stop, an alert goes to the developer. | Create: job run | [FR-SYS-10][fr], [FR-ADM-33][fr], [NFR-24][nfr] |
 | 13 | Developer | After any restore from a backup, runs the job before the system reopens, so a restore never brings back data that should be gone. | — | [NFR-29][nfr], [FR-SYS-05][fr], [EC-81][ec] |
@@ -2539,13 +2544,13 @@ These are not decided here. If the reviewers agree an answer is needed, add each
 4. **[P] (new in this doc) Disabling ends sessions at once.** [Roles §5.1][roles] says a disabled person "can no longer log in", but not whether a session that is already open keeps working. This document proposes that disabling ends all of that person's sessions, and that the server check refuses any request from a disabled account (WF-09C step 4, WF-09G step 4). If accepted, add it to roles §5.1.
 5. **Session lifetime.** How long does an admin session last? Does it end after a time without use? Is 2FA asked again after some days, or on a new device? (security, batch 3)
 6. **Lock details.** Does a wrong 2FA code or backup code count toward the 5-failure lock ([NFR-11][nfr])? Does the lock also block a correct backup code? Does the screen say the same thing for a wrong email and a wrong password, and does it say the account is locked? Can the Super Admin end a lock early?
-7. **[P] (new in this doc) 2FA setup and backup codes.** This document proposes that the setup finishes only after the admin types a first correct code from the app (WF-09B step 4). Also: how many backup codes are made; are they shown only once; can an admin make new ones (making the old ones stop working); and after logging in with a backup code, can an admin move 2FA to a new phone alone, or is a reset by the Super Admin needed (WF-09D step 4)?
-8. **Passwords.** How does a first or reset password reach the person (shown once to the Super Admin, who hands it over in person)? Must it be changed at the next login? Is there a minimum length? Can an admin change their own password? Batch-1 docs describe no "forgot password" link: confirm that a reset by the Super Admin is the only way, and say what the Super Admin does if he forgets his own password.
+7. **[P] (new in this doc) 2FA setup and backup codes.** Answered: [D-36][dl] (moving 2FA alone) and [D-38][dl] (the backup-code rules of [security][sec] open question 5); the first-code step stays **[P]**. This document proposes that the setup finishes only after the admin types a first correct code from the app (WF-09B step 4). Also: how many backup codes are made; are they shown only once; can an admin make new ones (making the old ones stop working); and after logging in with a backup code, can an admin move 2FA to a new phone alone, or is a reset by the Super Admin needed (WF-09D step 4)?
+8. **Passwords.** Answered: [D-36][dl] (changed at the next login) and [D-38][dl] (the rest, [security][sec] open question 4). How does a first or reset password reach the person (shown once to the Super Admin, who hands it over in person)? Must it be changed at the next login? Is there a minimum length? Can an admin change their own password? Batch-1 docs describe no "forgot password" link: confirm that a reset by the Super Admin is the only way, and say what the Super Admin does if he forgets his own password.
 9. **The setup script and the break-glass script.** Which actor kind and category does their audit entry use? None of `admin`, `system`, and `customer` fits exactly. Does the break-glass script also end the Super Admin's sessions, for example on the lost phone? Does the setup script write audit entries for the first accounts? (Runbooks: planned `07-operations/deployment-and-operations.md`.)
 10. **Sign out: one session or all?** [Roles §5.1][roles] says the Super Admin "can end an admin's sessions"; [EC-71][ec] speaks of "the lost phone's sessions". Can the Super Admin pick one session, such as the lost phone, or are all ended? Can the Super Admin end his own other sessions?
-11. **Disabled accounts.** Can a disabled account be enabled again, or is a new account always created (WF-09F)? Who or what deletes a former admin's credentials within 30 days ([privacy-and-retention §6.2][priv]): the retention job, or a manual step by the Super Admin? [Roles §5.1][roles] says the Super Admin cannot "demote" itself: is there a role-change action at all?
+11. **Disabled accounts.** Answered ([D-37][dl]): re-enable is possible; the retention job deletes the login details 30 days after a disable; there is no role-change action. Can a disabled account be enabled again, or is a new account always created (WF-09F)? Who or what deletes a former admin's credentials within 30 days ([privacy-and-retention §6.2][priv]): the retention job, or a manual step by the Super Admin? [Roles §5.1][roles] says the Super Admin cannot "demote" itself: is there a role-change action at all?
 12. **Two admins changing the same catalog item, setting, or block.** Reservations have a version check ([FR-ADM-07][fr], WF-05E). Do packages, add-ons, slots, sets, settings, and blocks have one too, or does the last save win? (WF-08A to WF-08I)
-13. **Valid values.** Which values are allowed for prices (can a price be ₱0?), daily stock (can it be 0?), slot times, deadlines, the notice period, email caps, rate limits, and retention periods? (api-specification, batch 3)
+13. **Valid values.** Answered ([D-35][dl]): prices may be ₱0 and daily stock 0; the other ranges stay as the [data model][data] proposes until the developer reviews them. Which values are allowed for prices (can a price be ₱0?), daily stock (can it be 0?), slot times, deadlines, the notice period, email caps, rate limits, and retention periods? (api-specification, batch 3)
 14. **Bringing items back.** Can an archived package, add-on, or delivery slot, or a deactivated set or room, be made active again? If so, is it audited the same way? Can an archived item still be edited? (WF-08A, WF-08C to WF-08E)
 15. **Cached pages.** Do any cached public pages show a setting value (for example the business info on the contact page, or the deposit amount)? If so, a settings change must refresh them too (WF-08F). And if the cache refresh fails after a catalog save, how long may the packages page show the old price? (The price locked at Submit is always the server's current price, [catalog-and-payments §2.1][cat].)
 16. **What a booking shows after its slot changes.** A booking keeps its stored service start when the slot's times change ([reservation-lifecycle §3.1][lc]). What do the reservation page, the status page, and the emails then show as its slot: the stored time, or the slot's new label and times? (WF-08D step 4)
@@ -2575,3 +2580,6 @@ These are already open in other documents and are not repeated here: how long ca
 [wf-avail]: availability-and-conflicts.md
 [wf-change]: changes-and-expiry.md
 [wf-notify]: notifications-and-tracking.md
+[sec]: ../05-technical/security.md
+[data]: ../05-technical/data-model.md
+[api]: ../05-technical/api-specification.md

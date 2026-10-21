@@ -262,7 +262,7 @@ flowchart TD
     B2 --> D1{"Accepted Philippine<br/>mobile format?"}
     D1 -->|"No"| X1["Message next to the field<br/>for example 0917 123 4567"]
     X1 --> B2
-    D1 -->|"Yes"| B3["Form converts it to<br/>+639XXXXXXXXX"]
+    D1 -->|"Yes"| B3["Form converts it to<br/>the standard +63 form"]
     B3 --> B4["Types an email address<br/>optional"]
     B4 --> D2{"Delivery?"}
     D2 -->|"Yes"| B5["Types the venue: barangay and city<br/>plus street and landmarks"]
@@ -295,7 +295,7 @@ Not needed. Every step of this sub-flow happens in the customer's browser; batch
 | Step | Actor | What happens | Data created, updated, or read | Rules and requirements |
 |---|---|---|---|---|
 | 1 | Customer | Types a name. | Browser session: the draft | [FR-PUB-05][fr] |
-| 2 | Customer, Website | Types a mobile number (required **[C]**). The form accepts only the four forms in BR-11, ignores spaces and dashes, and converts the number to `+639XXXXXXXXX`. Anything else gets a clear message next to the field. *Example:* `0917 123 4567` → `+639171234567`; `12345` is refused. | Browser session: the draft | [BR-11][br], [FR-PUB-05][fr], [D-08][dl], [NFR-17][nfr] (item 4) |
+| 2 | Customer, Website | Types a mobile number (required **[C]**). The form accepts any valid Philippine mobile number in a BR-11 form, checked with `libphonenumber-js` **[C]** (D-34), ignores spaces and dashes, and converts the number to the standard E.164 form `+63…`. Anything else gets a clear message next to the field. *Example:* `0917 123 4567` → `+639171234567`; `0895 123 4567` → `+638951234567`; `12345` is refused. | Browser session: the draft | [BR-11][br], [FR-PUB-05][fr], [D-08][dl], [NFR-17][nfr] (item 4) |
 | 3 | Customer | Types an email address, or leaves it empty **[C]**. Without one, the booking still works: no customer emails are sent, and the customer follows the booking on the status page. | Browser session: the draft | [D-08][dl], [FR-PUB-05][fr], [FR-NTF-21][fr], [EC-12][ec] |
 | 4 | Customer | **Delivery only:** types the venue. The barangay and city or municipality are required, plus the street and landmarks (whether those two are required is still open: [functional-requirements][fr] §7, question 6). The system does not check the service area; an admin does during review **[C]**. | Browser session: the draft | [FR-PUB-05][fr], [D-11][dl], [EC-13][ec] |
 | 5 | Customer | Optionally types an "Additional requirements" note (up to 500 characters). The box warns: do not enter IDs, birthdates, health, or religious information. The form asks for no other personal data. | Browser session: the draft | [FR-PUB-05][fr], [privacy-and-retention][priv] §2, §3.2 |
@@ -308,7 +308,7 @@ Not needed. Every step of this sub-flow happens in the customer's browser; batch
 
 | Decision | If yes | If no | Rule |
 |---|---|---|---|
-| Is the mobile number in an accepted Philippine mobile form? | Converted to `+639XXXXXXXXX` | Clear message next to the field | [BR-11][br], [FR-PUB-05][fr] |
+| Is it a valid Philippine mobile number in an accepted form? | Converted to the standard `+63…` form | Clear message next to the field | [BR-11][br], [FR-PUB-05][fr] |
 | Was an email address given? | Customer emails will be sent | No customer emails; status page only | [D-08][dl], [FR-NTF-21][fr] |
 | Is it a delivery? | The venue fields appear | No venue is asked for | [FR-PUB-05][fr] |
 | Are the barangay and city or municipality given? | Continue | Clear message | [FR-PUB-05][fr] |
@@ -379,7 +379,7 @@ flowchart TD
     D0 -->|"No"| X2["Refused: bot check failed"]
     D0 -->|"Yes"| D1{"Under the submission<br/>rate limit?"}
     D1 -->|"No"| X1["Refused for a while<br/>form keeps the data"]
-    D1 -->|"Yes"| D3{"Every field valid?<br/>mobile converted to +639"}
+    D1 -->|"Yes"| D3{"Every field valid?<br/>mobile converted to +63"}
     D3 -->|"No"| X3["Message next to each field<br/>form keeps the data"]
     D3 -->|"Yes"| D2{"Turnstile<br/>passed?"}
     D2 -->|"No"| X2

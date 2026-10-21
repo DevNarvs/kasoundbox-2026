@@ -23,7 +23,7 @@ The website reaches the database through a limited account. That account can run
 
 ## How to read this document
 
-- **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. **[P] (new in this doc)** marks a detail that neither the spec nor the batch-1 and batch-2 docs state. It was added so the schema is complete enough to build and test. It is not yet approved, and each one is listed in the open questions.
+- **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. **[P] (new in this doc)** marks a detail that neither the spec nor the batch-1 and batch-2 docs state. It was added so the schema is complete enough to build and test. It is not yet approved, and each one is listed in the open questions. **[P] items listed in [D-38][dl] are accepted as the Foundation baseline** (open questions 1 to 5, 7 to 10, and 13).
 - **Names.** This document owns the table, column, enum, index, and setting-key names. Function names are indicative, following the workflow developer notes; the final names, arguments, and result codes are in [api-specification][api].
 - **SQL.** The snippets show the design. The migrations are the source of truth once they exist (section 10).
 - **Rules.** This document says *how* a rule is stored and enforced, never *what* the rule is. Each constraint names its rule by ID (BR-xx, FR-xx, NFR-xx, EC-xx) or by its section in the owning doc. The numbers of the business rules (deadlines, limits, retention periods) appear only as defaults in the settings table (section 7) or in short parentheses.
@@ -386,7 +386,7 @@ All enums live in `app`. A new value is added with `ALTER TYPE … ADD VALUE` in
 | `proof_review_result` | `verified`, `rejected` | [BR-12][br]; spec §11 |
 | `outbox_status` | `queued`, `sent`, `failed`, `skipped` | [FR-NTF-16][fr] to [FR-NTF-19][fr] |
 | `email_priority` | `customer`, `admin` | [FR-NTF-20][fr] |
-| `email_type` | `request_received`, `needs_info`, `approved`, `reminder`, `deadline_extended`, `proof_not_accepted`, `confirmed`, `reservation_updated`, `rejected`, `cancelled`, `rescheduled`, `expired`, `admin_new_request`, `admin_proof_uploaded`, `admin_online_paused` | [WF-07B][wf-notify] (FR-NTF-01 to FR-NTF-15) |
+| `email_type` | `request_received`, `needs_info`, `approved`, `reminder`, `deadline_extended`, `proof_not_accepted`, `confirmed`, `reservation_updated`, `rejected`, `cancelled`, `rescheduled`, `expired`, `admin_new_request`, `admin_proof_uploaded`, `admin_online_paused`, `admin_2fa_moved` | [WF-07B][wf-notify] (FR-NTF-01 to FR-NTF-15); `admin_2fa_moved` is [FR-NTF-22][fr] **[C]** ([D-36][dl]) |
 | `audit_category` | `security`, `booking`, `catalog`, `settings`, `account` | [FR-ADM-32][fr]. Which actions use which category is [administration][wf-admin] open question 1 |
 | `actor_kind` | `admin`, `system`, `customer` | [FR-ADM-32][fr]. The setup and break-glass scripts write `system` entries in the `security` category **[P] (reconciled 2026-10-21)** ([security][sec] §4.1; [administration][wf-admin] open question 9) |
 | `job_name` | `ksb_expire_holds`, `ksb_queue_reminders`, `ksb_request_tick`, `ksb_heartbeat`, `ksb_complete_events`, `ksb_rotate_ip_key`, `ksb_retention`, `ksb_prune_logs`, `ksb_keep_alive`, `tick`, `daily` | The `pg_cron` job names of [api-specification][api] §6, plus the two job routes of its §4 **[P] (reconciled 2026-10-21)**; [FR-SYS-01][fr] to [FR-SYS-10][fr] |
@@ -405,7 +405,7 @@ The admin role is not an enum. It is Better Auth's `user.role` text column, limi
 - **Text.** Values are trimmed before saving. Free-text columns have length CHECKs **[P] (new in this doc)**: names 100, short labels 100, reasons and messages 1,000, internal notes 1,000 (the length in [ux-and-sitemap][ux] §8, proposal 6; **[P] (reconciled 2026-10-21)**), e-wallet references 64, emails 254. The customer's note is limited to 500 characters by [FR-PUB-05][fr].
 - **Versions [P] (reconciled 2026-10-21).** `resources`, `packages`, `addons`, `delivery_slots`, `blocks`, and `settings` also have `version integer NOT NULL DEFAULT 1`, raised by 1 on each successful update, for the version check of [api-specification][api] §1.9. It is not repeated in their column tables below.
 - **Never deleted.** Reservations, payments, blocks, and catalog items are never deleted by the app ([NFR-22][nfr]; [lifecycle][lc] §6.10). Only `app.run_retention()` deletes rows, and only on the schedule in [privacy-and-retention][priv].
-- **Who acted.** Columns ending `_by` hold the Better Auth user id (`text`), with a foreign key to `admin_auth.user`. User rows are never deleted. When a person stops being an admin, the row is scrubbed instead **[P] (new in this doc)** (section 5.19). So every `_by` column keeps its foreign key, and an acknowledgment can still show who received the payment ([catalog][cat] §5.3).
+- **Who acted.** Columns ending `_by` hold the Better Auth user id (`text`), with a foreign key to `admin_auth.user`. User rows are never deleted. When a person stops being an admin, the row is scrubbed instead **[C]** ([D-37][dl]; section 5.19). So every `_by` column keeps its foreign key, and an acknowledgment can still show who received the payment ([catalog][cat] §5.3).
 - **`created_at` and `updated_at`.** Every table has `created_at timestamptz NOT NULL DEFAULT now()`. Tables whose rows change also have `updated_at`, set by a shared trigger.
 - **Constraint names** follow `<table>_<what>_chk`, `_uq`, `_fk`, `_idx`, so tests and error mapping can refer to them by name **[P] (new in this doc)**.
 
@@ -440,7 +440,7 @@ Written only by the catalog functions, which also check [BR-10][br] (for example
 | `id` | `uuid` | PK | |
 | `name` | `text` | not null | |
 | `inclusions` | `text` | not null · `''` | What the package includes, shown on the packages page ([FR-PUB-02][fr]) |
-| `price_centavos` | `integer` | not null | `>= 0`. Whether ₱0 is allowed is [administration][wf-admin] open question 13 |
+| `price_centavos` | `integer` | not null | `>= 0`: a price of ₱0 is allowed **[C]** ([D-35][dl]) |
 | `sort_order` | `integer` | not null · `0` | Display order **[P] (new in this doc)** |
 | `archived_at` | `timestamptz` | null | Archived, never deleted ([catalog][cat] §1.6). Null means offered |
 | `created_at`, `updated_at` | `timestamptz` | not null | |
@@ -451,8 +451,8 @@ Written only by the catalog functions, which also check [BR-10][br] (for example
 |---|---|---|---|
 | `id` | `uuid` | PK | |
 | `name` | `text` | not null | |
-| `unit_price_centavos` | `integer` | not null | `>= 0` |
-| `daily_stock` | `integer` | not null | `>= 0`. Units bookable per date across all live reservations ([BR-03][br]) |
+| `unit_price_centavos` | `integer` | not null | `>= 0`: ₱0, a free extra, is allowed **[C]** ([D-35][dl]) |
+| `daily_stock` | `integer` | not null | `>= 0`. Units bookable per date across all live reservations ([BR-03][br]). 0 means the add-on is not available: none can be booked while it is 0 **[C]** ([D-35][dl]) |
 | `sort_order` | `integer` | not null · `0` | **[P] (new in this doc)** |
 | `archived_at` | `timestamptz` | null | Archived, never deleted |
 | `created_at`, `updated_at` | `timestamptz` | not null | |
@@ -482,7 +482,7 @@ One row per setting key. The keys, their types, and their defaults are in sectio
 | `updated_at` | `timestamptz` | not null · `now()` | |
 | `updated_by` | `text` | null · FK user | Null for the migration that seeds the row, and for the breaker's own writes |
 
-- `settings_value_chk`: `CHECK (app.setting_value_is_valid(key, value))`. The validator is an `IMMUTABLE` SQL function with one branch per key. It returns false for an unknown key, so a misspelt key cannot be stored. It checks each value's JSON type and basic bounds; the allowed ranges are [administration][wf-admin] open question 13.
+- `settings_value_chk`: `CHECK (app.setting_value_is_valid(key, value))`. The validator is an `IMMUTABLE` SQL function with one branch per key. It returns false for an unknown key, so a misspelt key cannot be stored. It checks each value's JSON type and basic bounds; the allowed ranges stay as section 7 proposes until the developer reviews them **[C]** ([D-35][dl]).
 - Written only by `app.update_setting` ([api-specification][api] §5.6; [WF-08F][wf-admin]), which checks the Super Admin role ([roles][roles] §2.6), and by the breaker and `app.resume_online_booking` for `online_paused_until` ([FR-ADM-28][fr], [FR-ADM-29][fr]).
 - Functions read settings through `app.setting(key)` ([api-specification][api] §5.2), for example `(app.setting('notice_period_minutes'))::int`.
 - Every change writes a `settings` audit entry, whose changed field is the key, never the value ([WF-08F][wf-admin]).
@@ -535,7 +535,7 @@ One row per reservation, whatever its source. Written only by the action functio
 | `contact_blanked_at` | `timestamptz` | null | **[P] (new in this doc)**. When an erasure or the retention job blanked the contact fields. The admin page then shows "erased" instead of empty fields |
 | **Customer** | | | |
 | `customer_name` | `text` | null | Blanked on the schedule ([privacy-and-retention][priv] §6.2). Whether it is required at booking is [booking-and-submission][wf-book] open question 7 |
-| `mobile` | `text` | null | Always stored as `+639XXXXXXXXX` ([BR-11][br]). Required until blanked ([D-08][dl]) |
+| `mobile` | `text` | null | Always stored in E.164 form: `+63` and the 10-digit mobile number ([BR-11][br]). Required until blanked ([D-08][dl]) |
 | `email` | `text` | null | Optional ([D-08][dl]). Stored in lower case |
 | `venue_barangay` | `text` | null | Delivery only. Kept until ledger end ([privacy-and-retention][priv] §6.2) |
 | `venue_city` | `text` | null | Delivery only. Kept into the anonymous statistics |
@@ -563,7 +563,7 @@ One row per reservation, whatever its source. Written only by the action functio
 | `reservations_final_status_chk` | `(status IN ('completed','rejected','cancelled','expired')) = (final_status_at IS NOT NULL)` | [Lifecycle][lc] §1.1 (final statuses) |
 | `reservations_closure_chk` | `(closure_date IS NULL) = (final_status_at IS NULL)`: no closure date while the reservation is open | [Privacy-and-retention][priv] §6.1 |
 | `reservations_legal_hold_chk` | When `legal_hold` is true, its reason, time, and admin are set | [Privacy-and-retention][priv] §5.6 |
-| `reservations_mobile_chk` | `mobile ~ '^\+639[0-9]{9}$'`; and `mobile IS NOT NULL OR contact_blanked_at IS NOT NULL` | [BR-11][br]; mobile required [C] ([D-08][dl]) |
+| `reservations_mobile_chk` | `mobile ~ '^\+63[89][0-9]{9}$'`; and `mobile IS NOT NULL OR contact_blanked_at IS NOT NULL`. A format backstop only: the app does the real check with `libphonenumber-js` **[C]** ([D-34][dl]) | [BR-11][br]; mobile required [C] ([D-08][dl]) |
 | `reservations_venue_chk` | Delivery has `venue_barangay` and `venue_city`; on-site has no venue fields | [FR-PUB-05][fr] |
 | `reservations_email_chk` | A simple shape check (`^[^@\s]+@[^@\s]+\.[^@\s]+$`) and the length limit **[P] (new in this doc)** | [FR-PUB-05][fr] |
 | `reservations_note_length_chk` | `char_length(customer_note) <= 500`, plus the other length limits in section 4 | [FR-PUB-05][fr] |
@@ -803,11 +803,11 @@ Each email is queued in the same transaction as the change that causes it ([FR-N
 | `unique_key` | `text` | not null · unique | Reservation + type + audit entry, or reservation + `reminder` + deadline ([FR-NTF-17][fr]). Queued with `ON CONFLICT (unique_key) DO NOTHING`. It is also passed to Resend as its idempotency key |
 | `email_type` | `email_type` | not null | |
 | `priority` | `email_priority` | not null | Customer emails first ([FR-NTF-20][fr]) |
-| `reservation_id` | `uuid` | null, no FK | Null for the breaker email |
+| `reservation_id` | `uuid` | null, no FK | Null for the breaker email and the 2FA-move email |
 | `audit_id` | `bigint` | null, no FK | The audit entry that caused it |
 | `recipient` | `text` | null | The email address. Blanked with the reservation's contact fields **[P] (new in this doc)** (section 9) |
 | `template_data` | `jsonb` | null | Only data that cannot be read from the reservation at send time, for example when a breaker pause ends. Never a raw QR token, a QR link, or a secret |
-| `qr_link_ciphertext` | `bytea` | null | **[P] (reconciled 2026-10-21).** The QR link of a `request_received` email, encrypted by the server with `OUTBOX_LINK_KEY` (option B of [security][sec] §4.5.4). The database never holds the key or the link in clear. Erased (set to null) when the row leaves `queued`, or when the QR code stops working (a reissue or a final status), whichever comes first ([api-specification][api] §1.13). The token version it belongs to is the reservation's `qr_issued_at` |
+| `qr_link_ciphertext` | `bytea` | null | **[P] (reconciled 2026-10-21).** The QR link of a `request_received` email, encrypted by the server with `OUTBOX_LINK_KEY` (option B of [security][sec] §4.5.4). The database never holds the key or the link in clear. Erased (set to null) when the row leaves `queued`, or when the QR code stops working (a reissue or a final status), whichever comes first ([api-specification][api] §1.13). The token version it belongs to is the reservation's `qr_issued_at`. Its AES-256-GCM associated data is the QR token hash and the email type, both known before the database call **[C]** ([D-26][dl]) |
 | `status` | `outbox_status` | not null · `'queued'` | |
 | `attempts` | `smallint` | not null · `0` | Up to the maximum-attempts setting ([FR-NTF-18][fr]) |
 | `next_attempt_at` | `timestamptz` | not null · `now()` | When it may be tried next. **Also the claim lease [P] (new in this doc):** claiming a row moves this time a short lease ahead, so the `after()` sender, the tick, and the daily sweep never send one row at once ([architecture][arch] §7.2, open question 5). No separate claimed-until column is needed |
@@ -928,7 +928,7 @@ The tables are generated by the Better Auth CLI for the installed 1.7.x version,
 
 | Table | Holds | Retention |
 |---|---|---|
-| `user` | Each admin: id, display name, email, role, ban state, 2FA-enabled flag | While the person is an admin; then scrubbed (below) |
+| `user` | Each admin: id, display name, email, role, ban state, 2FA-enabled flag, and the app's own `must_change_password` flag (below) | While the person is an admin; then scrubbed (below) |
 | `session` | Login sessions | Deleted when the account is disabled, reset, or signed out ([roles][roles] §5.1) |
 | `account` | The password hash (argon2id) | Credentials are deleted within the period in [privacy-and-retention][priv] §6.2 |
 | `two_factor` | The TOTP secret and backup codes | As `account` |
@@ -938,9 +938,11 @@ Additions made in hand-written migrations **[P] (new in this doc)**:
 
 - `user_role_chk`: `role IN ('superAdmin','admin')`.
 - `user_one_active_per_role_uq`: a unique index on `(role) WHERE banned IS NOT TRUE`. At most one Super Admin and one active Admin ([roles][roles] §5.1; [EC-75][ec]).
-- **Scrub instead of delete.** When a former admin's credentials are deleted, the `account`, `two_factor`, and `session` rows are deleted. The `user` row is kept: its email is replaced by a non-personal placeholder such as `removed-<id>@invalid`, and it stays banned. Only the id and the display name remain ([privacy-and-retention][priv] §6.2). Who runs this is [administration][wf-admin] open question 11.
+- **`must_change_password`** **[C]** ([D-36][dl]): `boolean NOT NULL DEFAULT true`, added to `user` as a Better Auth additional field. It is set when an account is created or reset and cleared when the person changes the password; while it is true, only the change-password page opens ([api-specification][api] §1.2). Better Auth has no built-in flag for this.
+- **`disabled_at`** **[P] (new in this doc)**: `timestamptz`, null while the account is active. Set by `app.disable_admin` and cleared by `app.reenable_admin`; the retention job counts the 30 days from it ([api-specification][api] §5.7, §5.9).
+- **Scrub instead of delete** **[C]** ([D-37][dl]). The daily retention job deletes a disabled admin's login details 30 days after the disable: the `account` (password hash), `two_factor` (2FA secret and backup codes), and `session` rows. The `user` row is kept: its email is replaced by a non-personal placeholder such as `removed-<id>@invalid`, and it stays banned. Only the id and the display name remain, so the audit log and "received by" stay attributable ([privacy-and-retention][priv] §6.2). The Super Admin can re-enable a disabled account ([api-specification][api] §3.8).
 - **No raw IP addresses.** Better Auth stores the client IP on sessions by default. It is turned off (an option such as `advanced.ipAddress.disableIpTracking`, **[U]** for 1.7.x), because the system keeps no raw IP addresses ([privacy-and-retention][priv] §3.2).
-- `app_rw` cannot update `role` (section 2.2). No action changes a role ([roles][roles] §5.1).
+- `app_rw` cannot update `role` (section 2.2). No action changes a role **[C]** ([D-37][dl]; [roles][roles] §5.1).
 
 ### 5.20 Views and shared helper functions
 
@@ -948,9 +950,10 @@ These are owned by `app_owner`. The views run with their owner's rights, so `app
 
 | Object | Kind | What it does |
 |---|---|---|
-| `app.manila_today()` | `VOLATILE` function | `(clock_timestamp() AT TIME ZONE 'Asia/Manila')::date`, read after the function's locks are held ([api-specification][api] §1.4, §5.2; section 8) **[P] (reconciled 2026-10-21)** |
+| `app.now()` | `VOLATILE` function | The current moment: `clock_timestamp()`, except in a test database with the test-only marker, where `SET LOCAL app.test_now` fixes it for that transaction. Production has no marker **[C]** ([D-29][dl]; section 8) |
+| `app.manila_today()` | `VOLATILE` function | `(app.now() AT TIME ZONE 'Asia/Manila')::date`, read after the function's locks are held ([api-specification][api] §1.4, §5.2; section 8) **[C]** ([D-29][dl]) |
 | `app.holds_capacity(status)` | `IMMUTABLE` function | `status IN ('pending','awaiting_deposit','confirmed')`: the same list as the index predicate. A catalog test checks that they agree ([lifecycle][lc] §1.1) |
-| `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)` | `IMMUTABLE` function | True for a hold whose deadline has passed and is not paused, or whose pause has reached the service start ([BR-05][br], [BR-12][br]). The second part is [availability-and-conflicts][wf-avail] open question 3. It is the shared predicate the workflow docs ask for ([WF-05A][wf-avail], [WF-05D][wf-avail]) |
+| `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)` | `IMMUTABLE` function | True for a hold whose deadline has passed and is not paused, or whose pause has reached the service start ([BR-05][br], [BR-12][br]) **[C]** ([D-25][dl]). It is the shared predicate the workflow docs ask for ([WF-05A][wf-avail], [WF-05D][wf-avail]) |
 | `app.reservation_effective` | View | Every reservation column, plus: `effective_status` (Expired for an overdue hold); `is_overdue`; `is_urgent` (`event_date = app.manila_today()`); `total_centavos`; `deposit_paid_centavos`, `balance_paid_centavos`, `refund_paid_centavos` (active rows only); `balance_due_centavos` = total minus active deposits and balances ([catalog][cat] §2.1); `has_unreviewed_proof` (an uploaded proof with no review yet, for the dashboard, [api-specification][api] §3.2) **[P] (reconciled 2026-10-21)**. The admin dashboard, list, and details read reservations through this view ([api-specification][api] §3.2, §5.8) |
 | `app.reservation_resources`, `app.block_resources` | Views | Section 5.4 |
 | `app.setting_value_is_valid(key, value)` | `IMMUTABLE` function | Section 5.2 |
@@ -1052,6 +1055,7 @@ Every row below is a key in `settings` (section 5.2). The value is stored as JSO
 | `breaker_limit` | integer > 0 | 6 (the next request in the window is refused) | online requests per 60 minutes | Booking rules | [BR-07a][br] |
 | `breaker_pause_minutes` | integer > 0 | 60 | minutes | Booking rules | [BR-07a][br] |
 | `online_paused_until` | timestamp string or `null` | `null` | moment | System | [BR-07a][br]; [FR-ADM-29][fr] |
+| `public_booking_open` | boolean | `false` | — | Launch **[C]** | [FR-ADM-34][fr] ([D-30][dl]) |
 | `reminder_lead_hours` | integer > 0 | 6 | hours | Notifications | [FR-NTF-04][fr] ([D-10][dl]) |
 | `email_cap_daily` | integer > 0 | 100 **[U]** | emails per Manila day | Notifications | [FR-NTF-20][fr] |
 | `email_cap_monthly` | integer > 0 | 3,000 **[U]** | emails per Manila month | Notifications | [FR-NTF-20][fr] |
@@ -1073,7 +1077,8 @@ Every row below is a key in `settings` (section 5.2). The value is stored as JSO
 | `deposit_instructions` | object: `ewallet_name`, `ewallet_number`, `ewallet_account_name`, `office_address`, `office_hours` | Not set (O-03) | — | Payments | [Catalog][cat] §7 |
 | `deposit_terms_text` | text | Not set (O-03) | — | Payments | [Catalog][cat] §7 |
 
-- **Labels.** The reserved settings are [C] ([D-07][dl]); keeping the other values as settings is [P] ([FR-ADM-28][fr]); the retention defaults are [C] ([D-21][dl]).
+- **Labels.** The reserved settings are [C] ([D-07][dl]); keeping the other values as settings is [P] ([FR-ADM-28][fr]); the retention defaults are [C] ([D-21][dl]); `public_booking_open` is [C] ([D-30][dl]). The type and range checks above stay as proposed until the developer reviews them **[C]** ([D-35][dl]).
+- **The pre-launch switch.** While `public_booking_open` is false, online booking is closed: the booking function and the calendar refuse with `booking_not_open`, and every page sends `noindex` ([api-specification][api] §2.1, §2.3). A fresh production starts with it false; turning it on is the launch step ([D-28][dl], [D-30][dl]).
 - **The breaker window is fixed at 60 minutes.** [BR-07a][br] makes only the limit and the pause length settings.
 - **Not settings:** delivery slots (a table, section 5.1, though a reserved setting by permission), the number of sets (the active `resources` rows, [BR-01][br]), and each add-on's daily stock (a catalog value, [catalog][cat] §1.2).
 - **A change never moves existing reservations.** They keep their stored service start, deadline, and price snapshot ([EC-55][ec], [EC-56][ec]).
@@ -1091,8 +1096,12 @@ The rule is [NFR-19][nfr]: every calendar date is a Manila date. The database's 
 | A Manila wall-clock time | `time` | `delivery_slots.starts_at`, `arrival_time`, `onsite_hours` |
 
 ```sql
+-- "Now" (app.now()): clock_timestamp(), unless a test database with the test-only marker
+-- has fixed it for this transaction with SET LOCAL app.test_now (D-29)
+SELECT app.now();
+
 -- "Today" in Manila (app.manila_today()), read after the locks are held
-SELECT (clock_timestamp() AT TIME ZONE 'Asia/Manila')::date;
+SELECT (app.now() AT TIME ZONE 'Asia/Manila')::date;
 
 -- The Manila date of a moment. A bare ts::date gives the UTC date: wrong between 00:00 and 08:00 Manila (EC-82)
 SELECT (v_ts AT TIME ZONE 'Asia/Manila')::date;
@@ -1108,11 +1117,11 @@ v_deadline := least(v_now + make_interval(hours => (app.setting('review_deadline
 extract(year FROM v_now AT TIME ZONE 'Asia/Manila')
 
 -- The start of today in Manila as a moment, for the daily email cap
-(date_trunc('day', now() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila'
+(date_trunc('day', app.now() AT TIME ZONE 'Asia/Manila')) AT TIME ZONE 'Asia/Manila'
 ```
 
-- **`now()` and `clock_timestamp()`.** `now()` is the start of the transaction. A function that waited for the capacity lock takes `v_now := clock_timestamp()` after the lock is held, and uses `v_now` everywhere after that ([architecture][arch] §6.3).
-- **Immutability.** `timezone(text, timestamptz)` is immutable, so the Manila-date CHECK on `reservations` (section 5.3) is valid. It is also why `app.hold_is_overdue` takes the time as an argument instead of calling `now()`.
+- **`now()`, `clock_timestamp()`, and `app.now()`** **[C]** ([D-29][dl]). `now()` is the start of the transaction. A function that waited for the capacity lock takes `v_now := app.now()` after the lock is held, and uses `v_now` everywhere after that, including for the moment columns it writes ([architecture][arch] §6.3). `app.now()` is `clock_timestamp()` in production; a test database with the test-only marker can fix it per transaction ([test plan](../06-delivery/test-plan.md) §1.5; TC-SEC-54 checks that production has no marker).
+- **Immutability.** `timezone(text, timestamptz)` is immutable, so the Manila-date CHECK on `reservations` (section 5.3) is valid. It is also why `app.hold_is_overdue` takes the time as an argument instead of calling `now()` **[C]** ([D-25][dl]).
 - **Jobs.** `pg_cron` schedules are in UTC: the daily jobs run from `15 16 * * *` (00:15 Manila) to `35 16 * * *` (00:35 Manila), staggered as in [api-specification][api] §6 ([NFR-19][nfr]; [architecture][arch] §7.1).
 - **No daylight saving.** Asia/Manila is UTC+8 all year. The code still uses the zone name, never a fixed `+08`.
 - **In TypeScript.** Drizzle reads `timestamptz` columns as `Date`, `date` columns as `'YYYY-MM-DD'` strings (`mode: 'string'`), and `time` columns as strings. An event date never passes through a JavaScript `Date`, so no server time zone can shift it **[P] (new in this doc)**. Times are shown with `Intl.DateTimeFormat` and `timeZone: 'Asia/Manila'` ([NFR-19][nfr]).
@@ -1143,7 +1152,7 @@ The periods, the closure date, ledger end, the legal hold, and erasure are defin
 | Audit log: security events | `audit_log.category = 'security'`, `occurred_at` | Delete after the security period |
 | Audit log: booking events | `audit_log.reservation_id`, `category = 'booking'` | Counted, then deleted with their reservation at its ledger end (above) |
 | Retention run logs | `retention_runs.run_date` | Deleted at ledger end ([privacy-and-retention][priv] §11, question 11) |
-| Admin account data | Better Auth rows of banned users | Scrubbed and deleted as in section 5.19, if this job does it ([administration][wf-admin] open question 11) |
+| Admin account data | Better Auth rows of banned users, and when they were disabled | 30 days after the disable: deletes their `account`, `two_factor`, and `session` rows, and scrubs the `user` row, as in section 5.19 **[C]** ([D-37][dl]) |
 | Job logs (not personal data) | `job_runs.started_at`; `cron.job_run_details` | Not this job: the daily `app.prune_job_runs()` (`ksb_prune_logs`) deletes `job_runs` rows after 30 days, keeping the latest per job, and `cron.job_run_details` rows after 7 days **[P] (reconciled 2026-10-21)** ([api-specification][api] §5.9, §6; [architecture][arch] §7.1) |
 
 - **Erasure** (`app.process_erasure`, [WF-10D][wf-admin]) uses the same columns. Unless `legal_hold` is set, it blanks the contact and venue-detail fields and the outbox `recipient` at once, and sets `contact_blanked_at`. Payments are untouched ([privacy-and-retention][priv] §5.5). What else it blanks is [privacy-and-retention][priv] §11, question 4. If the answer includes the barangay, `reservations_venue_chk` must allow a null barangay after blanking.
@@ -1233,23 +1242,24 @@ These are not decided here. If the reviewers agree an answer is needed, add each
 
 **Raised by this document** (each is a **[P] (new in this doc)** proposal to confirm or correct):
 
-1. **One claims table.** `resource_claims` holds both booking and block claims, with status copies kept by composite foreign keys with `ON UPDATE CASCADE`. `reservation_resources` and `block_resources` become read-only views (sections 5.4 and 6). This answers [availability-and-conflicts][wf-avail] open question 12.
-2. **A Better Auth schema of its own.** `admin_auth`, with `public` left empty, and the fallback in section 2.1 **[U]**.
-3. **Money in whole centavos** (`integer`, `_centavos` columns) (section 4).
-4. **The urgent flag is computed from the event date, not stored** (section 5.20). This differs from spec §11, which lists it as a stored flag. Please confirm against [BR-06a][br] and [lifecycle][lc] §1.2.
-5. **New reservation columns.** `approved_at` and `approved_by`, `decision_reason`, `deposit_waived_at` and `deposit_waived_by`, `final_status_at`, `contact_blanked_at`, `qr_issued_at` (section 5.3). For `final_status_at` on Expired, this document proposes the moment the hold counted as expired, which also settles [changes-and-expiry][wf-change] open question 8.
+1. **One claims table.** Accepted ([D-38][dl]). `resource_claims` holds both booking and block claims, with status copies kept by composite foreign keys with `ON UPDATE CASCADE`. `reservation_resources` and `block_resources` become read-only views (sections 5.4 and 6). This answers [availability-and-conflicts][wf-avail] open question 12.
+2. **A Better Auth schema of its own.** Accepted ([D-38][dl]). `admin_auth`, with `public` left empty, and the fallback in section 2.1 **[U]**.
+3. **Money in whole centavos** (`integer`, `_centavos` columns) (section 4). Accepted ([D-38][dl]).
+4. **The urgent flag is computed from the event date, not stored** (section 5.20). Accepted ([D-38][dl]). This differs from spec §11, which lists it as a stored flag. Please confirm against [BR-06a][br] and [lifecycle][lc] §1.2.
+5. **New reservation columns.** Accepted ([D-38][dl]). `approved_at` and `approved_by`, `decision_reason`, `deposit_waived_at` and `deposit_waived_by`, `final_status_at`, `contact_blanked_at`, `qr_issued_at` (section 5.3). For `final_status_at` on Expired, this document proposes the moment the hold counted as expired, which also settles [changes-and-expiry][wf-change] open question 8.
 6. **Flags held by CHECKs.** `needs_info` exists only on Pending Confirmation, and `expiry_paused` only on Awaiting Deposit (section 5.3). Resolved (reconciled 2026-10-21): the same-day waiver from Pending Confirmation clears needs info, as approve does; [api-specification][api] §5.4 now says so too.
-7. **Database guards for the lifecycle.** The status trigger allows only the 11 arrows of [lifecycle][lc] §2, and a new row must start as Pending Confirmation. Block, payment, and audit rows have their own guard triggers (sections 5.3, 5.6, 5.7, and 5.11).
-8. **Admin user rows are scrubbed, never deleted** (section 5.19). Every `_by` foreign key stays valid, and acknowledgments keep "received by". This is read as meeting "only the admin's ID and display name stay" ([privacy-and-retention][priv] §6.2). It also needs the answer to [administration][wf-admin] open question 11.
-9. **Better Auth without raw IP addresses.** Turn off its session IP tracking (option name **[U]**), and add the role CHECK and the one-active-per-role index (section 5.19).
-10. **`app_rw` reads reservations only through `reservation_effective`**, never the base table (section 2.2).
+7. **Database guards for the lifecycle.** Accepted ([D-38][dl]). The status trigger allows only the 11 arrows of [lifecycle][lc] §2, and a new row must start as Pending Confirmation. Block, payment, and audit rows have their own guard triggers (sections 5.3, 5.6, 5.7, and 5.11).
+8. **Admin user rows are scrubbed, never deleted** (section 5.19). Accepted ([D-38][dl]), now **[C]** ([D-37][dl]). Every `_by` foreign key stays valid, and acknowledgments keep "received by". This is read as meeting "only the admin's ID and display name stay" ([privacy-and-retention][priv] §6.2). The daily retention job does it 30 days after a disable, which answers [administration][wf-admin] open question 11.
+9. **Better Auth without raw IP addresses.** Accepted ([D-38][dl]), pending its **[U]** check. Turn off its session IP tracking (option name **[U]**), and add the role CHECK and the one-active-per-role index (section 5.19).
+10. **`app_rw` reads reservations only through `reservation_effective`**, never the base table (section 2.2). Accepted ([D-38][dl]).
 11. **The outbox.** `next_attempt_at` doubles as the claim lease, which answers [architecture][arch] open question 5. Admin emails get one row per admin, which answers part of [notifications-and-tracking][wf-notify] open question 6 (Resolved (reconciled 2026-10-21): [api-specification][api] §5.9 now writes one row per admin recipient too). `recipient` is blanked together with the contact fields and on erasure ([privacy-and-retention][priv] §11, question 3, for the rest of the row) (sections 5.12 and 9).
 12. **`anonymized_bookings`** as the form of the "anonymous statistics", with exactly the fields that [privacy-and-retention][priv] §6.2 lists (section 5.17). Should the service type be kept too?
-13. **New defaults and limits.** `email_max_attempts` = 5 ([notifications-and-tracking][wf-notify] open question 1); the free-text length limits in section 4; the 400 MB storage warning. Resolved (reconciled 2026-10-21): internal notes 1,000 characters, as [ux-and-sitemap][ux] §8; `job_runs` kept 30 days, as [api-specification][api] §5.9.
+13. **New defaults and limits.** Accepted ([D-38][dl]). `email_max_attempts` = 5 ([notifications-and-tracking][wf-notify] open question 1); the free-text length limits in section 4; the 400 MB storage warning. Resolved (reconciled 2026-10-21): internal notes 1,000 characters, as [ux-and-sitemap][ux] §8; `job_runs` kept 30 days, as [api-specification][api] §5.9.
 14. **Setting shapes.** The fields of `business_info`, `onsite_hours`, and `deposit_instructions`; a single opening and closing time for on-site hours (O-02 may need hours per weekday); and the "not configured" refusal while a value is unset (section 7).
 15. **The IP-HMAC key.** Resolved (reconciled 2026-10-21): kept in Vault as `ip_hmac_key`, rotated by overwriting, and the HMAC computed inside the database (section 5.14); [security][sec] §4.4 and §4.7 now say the same.
 16. **Delivery slots cannot cross midnight** (`ends_at > starts_at`). This must be checked when the real slot times are set (O-02).
 17. **`submission_keys.request_fingerprint`.** Resolved (reconciled 2026-10-21): a repeat with the same key but different data is refused with `submission_key_mismatch` ([api-specification][api] §1.8; [security][sec] §4.4), which answers that part of [booking-and-submission][wf-book] open question 3.
+18. **`disabled_at` on the Better Auth user row** (section 5.19), so the retention job can count the 30 days of [D-37][dl] from the disable.
 
 **Already open elsewhere, with the schema change each answer would cause:**
 
@@ -1259,7 +1269,7 @@ These are not decided here. If the reviewers agree an answer is needed, add each
 | Which changes raise `version` | [availability-and-conflicts][wf-avail] open question 9 | Which functions increase `reservations.version` |
 | Audit categories for blocks, sets, payments, the breaker, the legal hold, erasure | [administration][wf-admin] open question 1 | How `audit_category` is used, and so which entries the retention job deletes |
 | A version check on catalog items, settings, and blocks | [administration][wf-admin] open question 12 | Resolved (reconciled 2026-10-21): a `version` column on those tables (section 4), as [api-specification][api] §1.9 requires |
-| Allowed values for prices, stock, and settings | [administration][wf-admin] open question 13 | The bounds in the CHECKs and in `app.setting_value_is_valid` |
+| Allowed values for prices, stock, and settings | Resolved: [D-35][dl] | Prices and daily stock `>= 0` (section 5.1); the setting bounds in `app.setting_value_is_valid` stay as section 7 proposes |
 | Resuming early restarts the breaker count | [administration][wf-admin] open question 17 | A new setting or column holding when the count restarted |
 | Recording the service-area check | [lookup-and-review][wf-review] open question 8 | A column on `reservations`, set by approve |
 | A proof under review when the booking is confirmed another way | [lookup-and-review][wf-review] open question 10 | Perhaps a third `proof_review_result` value |
@@ -1271,7 +1281,7 @@ These are not decided here. If the reviewers agree an answer is needed, add each
 | An actual payment date | [catalog-and-payments][cat] §10, question 7 | A `paid_on` date column on `payments` |
 | What an erasure blanks | [privacy-and-retention][priv] §11, question 4 | `reservations_venue_chk` and the erasure function |
 | "Event not held" and the closure date | [privacy-and-retention][priv] §11, question 10 | Whether that change resets `final_status_at` |
-| Mobile numbers that start with +638 **[U]** | [architecture][arch] open question 15 | `reservations_mobile_chk`, after [BR-11][br] changes first |
+| Mobile numbers that start with 08… | Resolved: [D-34][dl], which changed [BR-11][br] | `reservations_mobile_chk` accepts `+63[89]` (section 5.3) |
 | The backup's heartbeat | [architecture][arch] open question 11 | A narrow write grant for `app_backup`, or none |
 
 [dl]: ../00-project/decision-log.md

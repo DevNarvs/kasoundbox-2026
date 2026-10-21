@@ -110,7 +110,7 @@
 
 ## E
 
-- **E.164** — The international phone-number format. Every mobile number is saved as `+639XXXXXXXXX`; for example, 0917 123 4567 becomes +639171234567. See: [business-rules](../01-requirements/business-rules.md) BR-11.
+- **E.164** — The international phone-number format. Every mobile number is saved as `+63` followed by the 10-digit mobile number; for example, 0917 123 4567 becomes +639171234567. See: [business-rules](../01-requirements/business-rules.md) BR-11.
 - **Edit details** — The admin action that corrects a reservation's details, such as a wrong mobile number, with a reason. **[P]** See: [reservation-lifecycle](../02-domain/reservation-lifecycle.md).
 - **Email caps** — Daily and monthly limits on emails sent (defaults 100 a day and 3,000 a month **[U]**). Customer emails go first; emails left over at the cap go out the next day. See: [functional-requirements](../01-requirements/functional-requirements.md) FR-NTF-20.
 - **Erasure request** — A customer's request to delete their personal data. The Super Admin processes it; payment records are kept, and the customer is told what was kept and why. **[P]** See: [privacy-and-retention](../01-requirements/privacy-and-retention.md).

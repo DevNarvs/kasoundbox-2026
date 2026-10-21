@@ -71,6 +71,7 @@ The permissions are defined only in [roles-and-permissions](../01-requirements/r
 ### 1.2 Add-ons and daily stock
 
 - An add-on is an optional extra that the customer adds to a package, with a quantity. It has a name, a price per unit, and a daily stock **[C]** (D-02).
+- **Zero values [C]** (D-35). A package or add-on price may be ₱0, so a free extra can be offered. A daily stock of 0 means the add-on is not available: none can be booked while it is 0.
 - **Daily stock** is how many units can be booked for one date, by all bookings together. Delivery and on-site bookings share it. The rule that bookings never go over it is [BR-03](../01-requirements/business-rules.md).
 - Daily stock is a catalog value, not a setting. Either admin can change it. Lowering it below what is already booked on a future date is refused ([BR-10](../01-requirements/business-rules.md)).
 - *Example.* "Extra microphone: ₱200 each, daily stock 4". On Thursday 24 December, Ana has 2 of them, so 2 are left for other bookings that day.

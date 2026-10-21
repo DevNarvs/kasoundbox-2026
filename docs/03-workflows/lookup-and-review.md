@@ -397,7 +397,7 @@ flowchart TD
     X1 --> C2
     D1 -->|"Yes"| C3["Admin types a reference code,<br/>a name, or a mobile number"]
     C3 --> C4["Optional filters: status,<br/>service type, event date"]
-    C4 --> S1["Server tidies the text:<br/>code in capitals without spaces or dashes,<br/>mobile in the +639 form"]
+    C4 --> S1["Server tidies the text:<br/>code in capitals without spaces or dashes,<br/>mobile in the +63 form"]
     S1 --> S2["Live search of all reservations"]
     S2 --> D2{"Any match?"}
     D2 -->|"No"| X2["No results"]

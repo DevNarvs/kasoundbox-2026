@@ -71,7 +71,7 @@ Until that review, every legal statement here is the research's best reading. It
 | Data | Given by, and when | Used for | How long it is kept |
 |---|---|---|---|
 | Customer name | The customer | Knowing whose booking it is; "received from" on acknowledgments | Closure + 2 years (section 6) |
-| Mobile number (saved in the `+639XXXXXXXXX` format, BR-11) | The customer (required) **[C]** (D-08) | Contacting the customer; the status-page check; the limit on open requests (BR-07) | Closure + 2 years |
+| Mobile number (saved in the E.164 `+63…` format, BR-11) | The customer (required) **[C]** (D-08) | Contacting the customer; the status-page check; the limit on open requests (BR-07) | Closure + 2 years |
 | Email address | The customer (optional) **[C]** (D-08) | Sending the customer emails ([functional-requirements](functional-requirements.md), FR-NTF-01 to FR-NTF-12) | Closure + 2 years |
 | Venue barangay and city or municipality (delivery only) | The customer (required for delivery) | Delivering the set; admins check the address is inside the service area **[C]** (D-11) | Barangay: until ledger end. City: kept in the anonymous statistics |
 | Venue details: street and landmarks (delivery only) | The customer | Finding the venue | Closure + 2 years |
@@ -253,7 +253,7 @@ This covers two legal periods:
 | Audit log: booking events | Until that booking's ledger end | Added to monthly per-action counts in the retention run log, then deleted |
 | Retention run logs (counts only) | Until ledger end | Deleted |
 | Encrypted backups | 30 days at most, rolling. Only the latest monthly offline copy is kept | Expired or destroyed |
-| Admin account data | While the person is an admin. The account is disabled the same day they leave; their login credentials are deleted within 30 days | Only the admin's ID and display name stay, inside the audit entries that are still kept |
+| Admin account data | While the person is an admin. The account is disabled the same day they leave; the daily retention job deletes their login details (password hash, 2FA secrets, backup codes, sessions) 30 days after the disable **[C]** (D-37) | The user row is scrubbed and kept: only the admin's ID and display name stay, so the audit entries still kept and "received by" on acknowledgments still name the person |
 | Provider copies (Resend, Sentry, Vercel logs) | The shortest setting each provider offers (30 days or less). Customer data is scrubbed from Sentry | Expired by the provider |
 
 **What the "Then" words mean.**

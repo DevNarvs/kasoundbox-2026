@@ -28,7 +28,7 @@ This page is about keeping the booking system and its data safe. Here is what it
 - **What this document owns.** The assets, the threat actors, the threat model, and the security controls. Every rule, limit, and period (rate-limit numbers, retention periods, token formats, permissions, deadlines) is owned by a batch-1 document. This document cites it by ID and links to it. It never repeats the number, so the number can change in one place.
 - **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. They keep their batch-1 meaning.
 - **Controls without a label** implement the batch-1 requirement named next to them. They add no new rule.
-- **[P] (new in this doc)** marks a new control, limit, period, or visible behaviour that the batch-1 docs do not define. Each one is also listed under [Open questions](#open-questions). Nothing marked that way is decided until the review confirms it.
+- **[P] (new in this doc)** marks a new control, limit, period, or visible behaviour that the batch-1 docs do not define. Each one is also listed under [Open questions](#open-questions). Nothing marked that way is decided until the review confirms it. **[P] items listed in [D-38][dl] are accepted as the Foundation baseline** (open questions 1 to 13, 30, and 31).
 - **[U] from the research.** Facts from the technical research that are not yet checked keep their **[U]** label. They are collected in section 7.
 - **IDs.** Threats are numbered TM-01 to TM-41. These IDs are local to this document; the test plan can cite them.
 - **Developer names** (files, functions, routes, environment variables) are indicative. Final names come in [api-specification][api] (functions and routes), [data-model][data] (tables and grants), and [architecture][arch] (stack, versions, and environment variables).
@@ -271,6 +271,7 @@ export const auth = betterAuth({
 - **No "trust this device" [P] (new in this doc).** Better Auth can skip the code on a remembered device. The app never offers it, and the route handler drops the option if a request sends it. Every login asks for the code.
 - **The TOTP secret** must be stored in a form the server can read back, because the server needs it to check codes. Better Auth stores it encrypted with its secret **[U]** (checked in week-1 item 3).
 - **Backup codes [P] (new in this doc).** Ten one-time codes, shown once at setup ([roles-and-permissions][roles] §5.2). The admin prints them and keeps them at home. Making a new set needs the password and a current code, and it ends the old set at once. Each code works once ([WF-09D][wf-admin]).
+- **Moving 2FA alone [C]** ([D-36][dl]). After logging in with a backup code, an admin may move 2FA to a new phone without the Super Admin. It needs the password and a backup code, then a first code from the new phone; the old TOTP secret and backup codes stop working. It writes a `security` audit entry (section 4.11), and the Super Admin gets an email ([FR-NTF-22][fr]); when the Super Admin moves his own 2FA, no email is sent. Someone who has stolen a password and one backup code could move 2FA too; the email tells the Super Admin at once, who then signs out and resets that account ([WF-09G][wf-admin]).
 - **How backup codes are stored [P] (new in this doc).** Better Auth stores them encrypted with its secret (`storeBackupCodes: 'encrypted'`), not as one-way hashes. Whether the library supports hashed backup codes is **[U]**. Proposal: accept encrypted storage. A copy of the database alone does not reveal the codes, which is the aim of "hashed where stored" in [NFR-13][nfr]. This answers the question left in [WF-09B][wf-admin] (developer notes).
 
 #### Lockout and rate limits
@@ -296,6 +297,7 @@ All of this is **[P] (new in this doc)** and answers [administration][wf-admin] 
 
 - **Length.** At least 12 characters; long passphrases allowed; no rules about symbols; no forced periodic change. Dropping symbol rules and forced changes follows current NIST guidance (SP 800-63B).
 - **First and reset passwords** are made by the system: long and random, shown once to the Super Admin on screen, and handed over in person. Never by email, SMS, or Messenger.
+- **Changed at the next login [C]** ([D-36][dl]). A new or reset password must be changed at the next login, before anything else opens. Better Auth has no built-in flag for this, so the app keeps its own `must_change_password` flag ([data-model][data] §5.19), and the server check opens only the change-password page while it is set ([api-specification][api] §1.2). Long passphrases are still welcome, and there is still no periodic change.
 - **Changing your own password** needs the current password, and ends your other sessions.
 - **No "forgot password" link.** There is no reset email. The Super Admin resets the Admin ([WF-09G][wf-admin]). If the Super Admin forgets his own password, the break-glass script sets a new one.
 
@@ -446,12 +448,12 @@ Implements [NFR-11][nfr] and [NFR-12][nfr], with the hold limits and the breaker
 **The order of the checks [P] (reconciled 2026-10-21).** This answers [booking-and-submission][wf-book] open question 5, in the order of [api-specification][api] §2.3. The cheapest checks run first, so a flood costs as little as possible:
 
 1. **Honeypot.**
-2. **Submission rate limit** ([NFR-11][nfr]), counted in one database statement. **Every attempt counts**, including a repeat with the same duplicate key. A customer who reaches the limit is told to message or call.
+2. **Submission rate limit** ([NFR-11][nfr]), counted in one database statement. **Every attempt counts**, including a repeat with the same duplicate key **[C]** ([D-27][dl]). A customer who reaches the limit is told to message or call.
 3. **Field validation** with the shared Zod schema, and the mobile number converted to its standard form ([BR-11][br]).
 4. **Turnstile siteverify.**
 5. **One call to the booking function** (`app.book_reservation`), which runs the order fixed in [BR-09][br] (developer note): the capacity lock, the duplicate key, overdue holds, notice, hold limits and the breaker, a set or the room, then add-on stock.
 
-A request caught at step 1 or 4 sees one generic message: "We could not check that this request came from a person. Please try again, or message or call us." It never says which check failed **[P] (new in this doc)**.
+A request caught at step 1 or 4 sees one generic message: "We could not check that you are not a robot. Please try again." It never says which check failed **[C]** ([D-27][dl]).
 
 **Rate limits.**
 
@@ -537,7 +539,7 @@ Implements [FR-PUB-08][fr] to [FR-PUB-14][fr], [NFR-11][nfr], [NFR-13][nfr], and
 **Proposal: option B** (chosen, reconciled 2026-10-21). It keeps every batch-1 rule as it is, and it limits what a leak can show to the emails still waiting. In the data model, the ciphertext is the outbox column `qr_link_ciphertext`, and the token's version is the reservation's `qr_issued_at` ([data-model][data] §5.3, §5.12); the function contracts are in [api-specification][api] §1.13.
 
 - **Who makes the token.** Option B needs the server, not the database, to make the token before the call; [WF-02][wf-book] allows either. The same applies to staff-created and recreated requests, which also send the request-received email ([FR-NTF-01][fr]).
-- **Encryption.** AES-256-GCM with a fresh random nonce per row. The associated data is the outbox row ID and the reservation ID, so a ciphertext cannot be moved to another row. The key, `OUTBOX_LINK_KEY` (32 random bytes), is a Vercel production secret; previews get none. The database never sees the key.
+- **Encryption.** AES-256-GCM with a fresh random nonce per row. The associated data is the QR token hash and the email type (`request_received`), both known before the database call **[C]** ([D-26][dl]). The outbox row ID and the reservation ID are not used: the database makes them during that call. So a ciphertext cannot be moved to another reservation's row or used for another email type, and it no longer decrypts once the QR code is reissued. The key, `OUTBOX_LINK_KEY` (32 random bytes), is a Vercel production secret; previews get none. The database never sees the key.
 - **At send time,** the sender checks that the reservation's token version is still the one in the row, and that the QR code is still valid. If not, the email goes out without the QR link, and says that a new QR code can be taken on the status page.
 - **Provider copies.** Resend keeps a copy of each sent email for its own retention period ([privacy-and-retention][priv] §6.2, "Provider copies"). That copy holds the link under every option except D. A working QR link shows only "present this at our office" to anyone who is not an admin ([FR-PUB-09][fr]), so the harm is small.
 - **Option C** remains worth weighing if the review wants the QR code to be shown again. It would also answer [booking-and-submission][wf-book] open question 2, [lookup-and-review][wf-review] open question 14, and [functional-requirements][fr] §7 question 4.
@@ -758,6 +760,7 @@ Implements [NFR-15][nfr], [NFR-23][nfr], and [NFR-25][nfr].
 | Job route called without the right secret | The route's name (never the received value) |
 | Rate limit tripped (once per key and time window, so a flood does not fill the log) | The limit's name and the IP-HMAC. The breaker's own entry is [WF-01C][wf-book] step 12; its category is [administration][wf-admin] open question 1 |
 | Break-glass script run | Actor kind "system", reason "break-glass" (section 4.1) |
+| 2FA moved to a new phone after a backup-code login **[C]** ([D-36][dl]) | The admin; the Super Admin is emailed unless he moved his own (section 4.1) |
 | Proof image viewed | The admin and the proof (section 4.6) |
 
 These entries hold no customer data, and are kept for the security-event period in [privacy-and-retention][priv] §6.2. They are the main evidence after an incident (section 4.13).
@@ -930,22 +933,22 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Authentication**
 
-1. **[P] argon2id parameters and the scrypt fallback** (section 4.1): m = 19,456 KiB, t = 2, p = 1; scrypt N = 2^17, r = 8, p = 1, maxmem 256 MiB; re-hash on login when the parameters rise. Update [NFR-09][nfr] if accepted.
-2. **[P] Session lifetime** (section 4.1): 24 hours from login, no sliding renewal, no "trust this device". Answers [administration][wf-admin] open question 5. Update [NFR-09][nfr].
-3. **[P] Lock details** (section 4.1): wrong 2FA and backup codes count toward the account lock; a locked account refuses everything; generic messages; a reset clears a lock. Answers [administration][wf-admin] open question 6. Update [NFR-11][nfr].
-4. **[P] Passwords** (section 4.1): at least 12 characters; system-made first and reset passwords handed over in person; changing your own password needs the current one; no "forgot password" link; the break-glass script for a forgotten Super Admin password. Should a first or reset password also have to be changed at the next login? Better Auth has no built-in flag for that. Answers [administration][wf-admin] open question 8. Update [roles-and-permissions][roles] §5.1.
-5. **[P] Backup codes** (section 4.1): ten codes, shown once; a new set needs the password and a code, and ends the old set; stored encrypted rather than hashed. Answers [administration][wf-admin] open question 7 (the count and the new-set rule). Update [roles-and-permissions][roles] §5.2, and the "hashed where stored" wording of [NFR-13][nfr].
-6. **[P] Sign out** (section 4.1): the Super Admin's sign-out ends all of that admin's sessions; each admin can end their own other sessions. Answers [administration][wf-admin] open question 10. Update [roles-and-permissions][roles] §5.1.
-7. **[P] Break-glass and the setup script** (section 4.1): the script also ends the Super Admin's sessions and can set a new password; the setup script audits the first accounts. Answers [administration][wf-admin] open question 9. Update [roles-and-permissions][roles] §5.2 and [FR-ADM-32][fr]. Resolved (reconciled 2026-10-21): both scripts' entries use actor kind "system" and category "security", and [api-specification][api] §3.8 now says so.
-8. **[P] Better Auth endpoint allow-list, and account changes through the app's own functions** (sections 4.1, 4.2). Confirm in [api-specification][api].
-9. **[P] No raw IP addresses in Better Auth** (section 4.1): HMAC-keyed limiter storage, or the limiter off; the IP removed from session rows. Answers [architecture][arch] open question 16, pending the **[U]** check.
-10. **[P] Minimum versions** (sections 4.1 and 4.10): Better Auth 1.7.7 and `sharp` 0.35.5, checked in CI. Add to [NFR-30][nfr] or [architecture][arch].
+1. **[P] argon2id parameters and the scrypt fallback** Accepted ([D-38][dl]) (section 4.1): m = 19,456 KiB, t = 2, p = 1; scrypt N = 2^17, r = 8, p = 1, maxmem 256 MiB; re-hash on login when the parameters rise. Update [NFR-09][nfr] if accepted.
+2. **[P] Session lifetime** Accepted ([D-38][dl]) (section 4.1): 24 hours from login, no sliding renewal, no "trust this device". Answers [administration][wf-admin] open question 5. Update [NFR-09][nfr].
+3. **[P] Lock details** Accepted ([D-38][dl]) (section 4.1): wrong 2FA and backup codes count toward the account lock; a locked account refuses everything; generic messages; a reset clears a lock. Answers [administration][wf-admin] open question 6. Update [NFR-11][nfr].
+4. **[P] Passwords** Accepted ([D-38][dl]) (section 4.1): at least 12 characters; system-made first and reset passwords handed over in person; changing your own password needs the current one; no "forgot password" link; the break-glass script for a forgotten Super Admin password. A first or reset password must also be changed at the next login, through the app's own flag, since Better Auth has none **[C]** ([D-36][dl]). Answers [administration][wf-admin] open question 8. Update [roles-and-permissions][roles] §5.1.
+5. **[P] Backup codes** Accepted ([D-38][dl]) (section 4.1): ten codes, shown once; a new set needs the password and a code, and ends the old set; stored encrypted rather than hashed. After a backup-code login, an admin may move 2FA to a new phone alone, with the password and a backup code, audited in `security`, and the Super Admin is emailed unless he moved his own **[C]** ([D-36][dl]). Answers [administration][wf-admin] open question 7 (the count and the new-set rule). Update [roles-and-permissions][roles] §5.2, and the "hashed where stored" wording of [NFR-13][nfr].
+6. **[P] Sign out** Accepted ([D-38][dl]) (section 4.1): the Super Admin's sign-out ends all of that admin's sessions; each admin can end their own other sessions. Answers [administration][wf-admin] open question 10. Update [roles-and-permissions][roles] §5.1.
+7. **[P] Break-glass and the setup script** Accepted ([D-38][dl]) (section 4.1): the script also ends the Super Admin's sessions and can set a new password; the setup script audits the first accounts. Answers [administration][wf-admin] open question 9. Update [roles-and-permissions][roles] §5.2 and [FR-ADM-32][fr]. Resolved (reconciled 2026-10-21): both scripts' entries use actor kind "system" and category "security", and [api-specification][api] §3.8 now says so.
+8. **[P] Better Auth endpoint allow-list, and account changes through the app's own functions** Accepted ([D-38][dl]) (sections 4.1, 4.2). Confirm in [api-specification][api].
+9. **[P] No raw IP addresses in Better Auth** Accepted ([D-38][dl]) (section 4.1): HMAC-keyed limiter storage, or the limiter off; the IP removed from session rows. Answers [architecture][arch] open question 16, pending the **[U]** check.
+10. **[P] Minimum versions** Accepted ([D-38][dl]) (sections 4.1 and 4.10): Better Auth 1.7.7 and `sharp` 0.35.5, checked in CI. Add to [NFR-30][nfr] or [architecture][arch].
 
 **Authorization and logging**
 
-11. **[P] How a database function knows who is acting** (section 4.2): the actor's ID as the first parameter; the function checks the role and the disabled flag. Answers [administration][wf-admin] open question 22.
-12. **[P] The role-table coverage test** (section 4.2). Add to the test plan.
-13. **[P] Security events** (section 4.11): the list of what the `security` category records, and never storing a typed email that matches no admin. Answers [administration][wf-admin] open question 3. Update [FR-ADM-32][fr].
+11. **[P] How a database function knows who is acting** Accepted ([D-38][dl]) (section 4.2): the actor's ID as the first parameter; the function checks the role and the disabled flag. Answers [administration][wf-admin] open question 22.
+12. **[P] The role-table coverage test** Accepted ([D-38][dl]) (section 4.2). Add to the test plan.
+13. **[P] Security events** Accepted ([D-38][dl]) (section 4.11): the list of what the `security` category records, and never storing a typed email that matches no admin. Answers [administration][wf-admin] open question 3. Update [FR-ADM-32][fr].
 14. **[P] Proof views are audited; reservation views are not** (section 4.6). Answers [lookup-and-review][wf-review] open question 3.
 
 **Status lookup, QR, and documents**
@@ -962,7 +965,7 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Public form and uploads**
 
-24. **The order of the first checks** (section 4.4). Resolved (reconciled 2026-10-21): honeypot, rate limit, field validation, Turnstile, then `app.book_reservation`, as [api-specification][api] §2.3. Still **[P]**: every attempt counting toward the submission limit, and one generic bot-check message. Answers [booking-and-submission][wf-book] open question 5.
+24. **The order of the first checks** (section 4.4). Resolved (reconciled 2026-10-21): honeypot, rate limit, field validation, Turnstile, then `app.book_reservation`, as [api-specification][api] §2.3. Resolved ([D-27][dl]): every attempt counts toward the submission limit, and both bot checks show one generic message, "We could not check that you are not a robot. Please try again." Answers [booking-and-submission][wf-book] open question 5.
 25. **Duplicate-submission keys** (section 4.4). Resolved (reconciled 2026-10-21): the key in `localStorage`, the draft in `sessionStorage`, a fingerprint stored with the key's hash, and the same key with other data refused with `submission_key_mismatch`; this answers [booking-and-submission][wf-book] open question 3. The "browser session" wording of [FR-PUB-06][fr], [EC-01][ec], and [EC-02][ec] still needs the matching update.
 26. **[P] A hold-limit refusal never shows the existing reference code or QR** (section 4.4). Update [FR-PUB-06][fr] or [EC-09][ec].
 27. **[P] Turnstile response checks and the edge backstop** (section 4.4): hostname and action checked; Vercel Firewall's rule on the booking, status, and sign-in paths. Joins [architecture][arch] open question 12.
@@ -971,12 +974,12 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Database, secrets, and operations**
 
-30. **[P] Role timeout values** (section 4.3): the same as [architecture][arch] §6, pending the **[U]** check through the pooler.
-31. **[P] Platform and account settings** (sections 4.7, 4.9, 4.10): two-factor login on every provider account, with recovery codes offline; Vercel Standard Deployment Protection; a sending-only Resend key; a secret scanner in CI; rotating secrets after a possible leak or a departure; only `postgres` can read Vault; GitHub Actions pinned to commits with minimal permissions; the web headers and the third-party-script rule; one `CRON_SECRET` of at least 32 random bytes (agreeing with [architecture][arch] open question 8).
+30. **[P] Role timeout values** Accepted ([D-38][dl]) (section 4.3): the same as [architecture][arch] §6, pending the **[U]** check through the pooler.
+31. **[P] Platform and account settings** Accepted ([D-38][dl]) (sections 4.7, 4.9, 4.10): two-factor login on every provider account, with recovery codes offline; Vercel Standard Deployment Protection; a sending-only Resend key; a secret scanner in CI; rotating secrets after a possible leak or a departure; only `postgres` can read Vault; GitHub Actions pinned to commits with minimal permissions; the web headers and the third-party-script rule; one `CRON_SECRET` of at least 32 random bytes (agreeing with [architecture][arch] open question 8).
 32. **[P] Backups** (section 4.12): a sealed second copy of the `age` private key; a new key pair after a possible leak; the backup role stays strictly read-only, with GitHub's failure email as its alert; all admin sessions ended after a restore. Answers [architecture][arch] open question 11. Update [NFR-27][nfr] to [NFR-29][nfr] if accepted.
 33. **Research ideas not adopted.** A per-IP limit on live holds per date, a daily breaker limit, holds that end a set time before the service start, and a bulk release of holds by IP-HMAC or time window (section 6, note 8). Does the business-rules owner want any of them? They would be new rules in [business-rules][br] and [reservation-lifecycle][lc], not security controls.
 
-Already open in other documents, and not repeated here: what a repeat submission shows instead of the QR code ([booking-and-submission][wf-book] open question 2); how a customer gets a QR code an admin reissued ([functional-requirements][fr] §7, question 4); the QR code for a staff booking without email ([lookup-and-review][wf-review] open question 14); the QR code of an overdue hold (open question 1 there); which statuses allow a reissue ([lookup-and-review][wf-review] open question 7 and [notifications-and-tracking][wf-notify] open question 13); which moment counts as "before the deadline" for an upload ([notifications-and-tracking][wf-notify] open question 14); disabling an account ends its sessions ([administration][wf-admin] open question 4, which this document supports); who deletes a former admin's credentials ([administration][wf-admin] open question 11); how long outbox rows are kept ([privacy-and-retention][priv] §11, question 3).
+Already open in other documents, and not repeated here: what a repeat submission shows instead of the QR code ([booking-and-submission][wf-book] open question 2); how a customer gets a QR code an admin reissued ([functional-requirements][fr] §7, question 4); the QR code for a staff booking without email ([lookup-and-review][wf-review] open question 14); the QR code of an overdue hold (open question 1 there); which statuses allow a reissue ([lookup-and-review][wf-review] open question 7 and [notifications-and-tracking][wf-notify] open question 13); which moment counts as "before the deadline" for an upload ([notifications-and-tracking][wf-notify] open question 14); disabling an account ends its sessions ([administration][wf-admin] open question 4, which this document supports); how long outbox rows are kept ([privacy-and-retention][priv] §11, question 3).
 
 [gl]: ../00-project/glossary.md
 [dl]: ../00-project/decision-log.md

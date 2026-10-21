@@ -38,7 +38,7 @@ Call or message the Super Admin **the same day**. Say when it happened and what 
 
 - **What this document owns.** The procedures: the order of the steps, who does them, and how to check them. Every rule, limit, period, and value (backup periods, rate limits, retention periods, cron schedules, versions, variable names) is owned by another document and is cited here by ID and link. A number appears here only as a short reminder in brackets. If a number here and the owning document differ, the owning document is right.
 - **Labels.** **[C]** confirmed decision · **[P]** proposed, accepted with the spec approval but may change · **[U]** unverified fact, to be checked in the week-1 test or before launch · **[O-nn]** open item in the [decision log][dl]. They keep their batch-1 meaning. A proposal made in a sibling document is cited as "[P] in [architecture][arch] §11.1" (or similar).
-- **[P] (new in this doc)** marks a procedure step, an order of steps, or a value that no other document defines. Each one is listed under [Open questions](#open-questions). Nothing marked that way is decided until the review confirms it.
+- **[P] (new in this doc)** marks a procedure step, an order of steps, or a value that no other document defines. Each one is listed under [Open questions](#open-questions). Nothing marked that way is decided until the review confirms it. **[P] items listed in [D-38][dl] are accepted as the Foundation baseline** (open questions 1 to 11).
 - **Commands and names are indicative.** Function and route names come from [api-specification][api], tables from [data-model][data], environment variables from [architecture][arch] §8. Run a command against production only where the step says so.
 - **Time.** Every date and time is Manila time (Asia/Manila, [NFR-19][nfr]). Cron expressions are not repeated here; they are in [architecture][arch] §7.1 and [api-specification][api] §6.
 - **The week-1 test.** "Week-1 item N" means item N of the week-1 test list in spec v0.2 §17 ([project-charter][charter] phase 4).
@@ -77,7 +77,7 @@ There are three lasting environments. What each one gets is owned by [architectu
 
 **Short-lived environments [P] (new in this doc).**
 
-- **The week-1 test project.** The week-1 test runs on real Vercel and Supabase services ([project-charter][charter] phase 4). It uses its own Supabase project, set up with the checklist in section 2, and deleted after the go / no-go decision. So production starts empty.
+- **The test project [C]** ([D-28][dl]). The week-1 test and acceptance testing (UAT) run on a separate test project on real Vercel and Supabase services ([project-charter][charter] phase 4), set up with the checklist in section 2. During the build it is also the staging environment. Production is created fresh just before launch, so it starts with no test records and acknowledgment numbering starts clean. Online booking stays closed on the test project (`public_booking_open` false, [D-30][dl]).
 - **A restore-test project.** A fresh Supabase project used only for a restore test (section 5.5), deleted the same day.
 - Whether the free plan allows a second Supabase project at the same time is **[U]** ([architecture][arch] open question 9). If it does not, the restore test uses a local Postgres (section 5.5).
 - **Production data never leaves production,** except as the encrypted backup. Nothing is copied into local or preview.
@@ -86,7 +86,7 @@ There are three lasting environments. What each one gets is owned by [architectu
 
 ## 2. First-time setup checklist
 
-Run this once for production, in this order. Run the same steps for the week-1 test project. Each step names the document that owns the values. Steps not defined elsewhere are marked.
+Run this first for the test project (section 1), and again, once, for production when it is created fresh just before launch ([D-28][dl]), in this order. Each step names the document that owns the values. Steps not defined elsewhere are marked.
 
 1. **Two-factor login on every provider account.** GitHub, Vercel, Supabase, Resend, Sentry, Cloudflare, and the domain registrar (O-05). Print the recovery codes and keep them offline ([P] in [security][sec] §4.7). Give every account an email address the Super Admin reads every day, so provider warnings are seen **[P] (new in this doc)**.
 2. **Make the GitHub repository private (O-06).** Do this before anything that stores secrets or backups there **[C]** ([D-22][dl]). Then:
@@ -130,9 +130,9 @@ Run this once for production, in this order. Run the same steps for the week-1 t
    2. Add the secrets `BACKUP_DATABASE_URL` (the backup role through the session pooler) and `SUPABASE_DB_CA`, in a protected environment ([security][sec] §4.12). Whether a private repository on the free plan can use environments is **[U]**; if not, they are repository secrets (open question 45).
    3. Add `backup.yml` only now, after step 2 **[C]** ([D-22][dl]; [FR-SYS-12][fr]). Give it a manual trigger as well as the nightly one, for the runs before a migration and for tests **[P] (new in this doc)**.
    4. Run it once by hand. Download the artifact, decrypt it on the laptop with the private key, list it with `pg_restore --list`, and delete the decrypted file **[P] (new in this doc)**. This is the start of the week-1 item 7 test (section 5.5).
-9. **Seed the two admin accounts.** Once, against production, from the developer's laptop: `npm run seed:admins` ([architecture][arch] §10.4). The script refuses to run if any admin account exists.
+9. **Seed the two admin accounts.** Once per project, from the developer's laptop: `npm run seed:admins` ([architecture][arch] §10.4): on the test project for the build and UAT, and on production when it is created. The script refuses to run if any admin account exists.
    - Give the script the production connection values for that run only: type them into the current shell session, never into a file, and close the terminal afterwards **[P] (new in this doc)**.
-   - Hand the Admin's first password over in person ([P] in [security][sec] §4.1).
+   - Hand the Admin's first password over in person ([security][sec] §4.1, accepted in [D-38][dl]). Each person changes it at the first login **[C]** ([D-36][dl]).
    - Each person logs in and sets up 2FA ([WF-09B][wf-admin]), then prints the backup codes and keeps them at home ([roles-and-permissions][roles] §5.2).
    - Check that the "account created" audit entries exist ([P] in [security][sec] §4.1).
 10. **First checks [P] (new in this doc).**
@@ -140,7 +140,8 @@ Run this once for production, in this order. Run the same steps for the week-1 t
     - The health panel shows a fresh run of every job.
     - Both Sentry monitors are green, and a test error arrives with no personal data ([NFR-23][nfr]).
     - A test email from Resend's dashboard reaches the Super Admin from the sending domain.
-    - No test booking is made in production: business records cannot be deleted ([NFR-22][nfr]). Acceptance testing is open question 46.
+    - No test booking is made in production: business records cannot be deleted ([NFR-22][nfr]). Acceptance testing runs on the test project **[C]** ([D-28][dl]).
+    - `public_booking_open` is false, so the public pages show "Opening soon" and every page sends `noindex` ([FR-ADM-34][fr]). In production it stays false until the launch step (section 10, row 18) **[C]** ([D-30][dl]).
 
 ---
 
@@ -391,7 +392,7 @@ Whether a copy can be slightly older than the "30 days at most" of the privacy n
 | When | Required by | Where | Passes when |
 |---|---|---|---|
 | **Week-1 test,** item 7 | [NFR-29][nfr]; [project-charter][charter] phase 4 | A backup of the week-1 project, restored into a second fresh project, or into a local Postgres (`supabase start`) if the free plan allows only one project **[U]** | Steps 1 to 10 of section 5.4 complete; the retention job ran; the counts match |
-| **Before launch,** in the test phase | [NFR-29][nfr]; [project-charter][charter] phase 6 | A backup of the production project, restored into a restore-test project | As above, with the release that will launch |
+| **Before launch,** in the test phase | [NFR-29][nfr]; [project-charter][charter] phase 6 | A backup of the test project (production is created only just before launch, [D-28][dl]), restored into a restore-test project | As above, with the release that will launch |
 | After each Postgres major upgrade **[P] (new in this doc)** | — | As above | As above |
 | Once a year **[P] (new in this doc)** | — | As above | As above |
 
@@ -568,12 +569,12 @@ The rules are [roles-and-permissions][roles] §5.2; the flows are [WF-09D][wf-ad
 
 1. The Admin calls the Super Admin the same day.
 2. The Super Admin signs out all of the Admin's sessions ([WF-09G][wf-admin]; [api-specification][api] §3.8).
-3. If a backup code is left, the Admin logs in with it ([WF-09D][wf-admin]). If not, the Super Admin resets the account; the new password is handed over in person ([P] in [security][sec] §4.1); the Admin sets up 2FA on the new phone ([WF-09B][wf-admin]) and prints new backup codes.
+3. If a backup code is left, the Admin logs in with it, then moves 2FA to the new phone alone with the password and a backup code; the Super Admin gets an email **[C]** ([D-36][dl]; [WF-09D][wf-admin]). If not, the Super Admin resets the account; the new password is handed over in person ([security][sec] §4.1) and changed at the next login ([D-36][dl]); the Admin sets up 2FA on the new phone ([WF-09B][wf-admin]) and prints new backup codes.
 4. The Super Admin checks the `security` audit events for logins since the loss **[P] (new in this doc)**.
 
 **The Super Admin's phone.**
 
-1. If a backup code is left, log in with it and sign out the other sessions ([api-specification][api] §3.8).
+1. If a backup code is left, log in with it, move 2FA to the new phone (no email for the Super Admin's own account, [D-36][dl]), and sign out the other sessions ([api-specification][api] §3.8).
 2. If none is left, run the break-glass script ([WF-09E][wf-admin]):
    1. On the developer's own laptop, take the `postgres` password from its offline place ([architecture][arch] §8.2).
    2. Run `scripts/break-glass-reset-2fa.ts` through the session pooler. It calls `app.break_glass_reset_2fa`, which removes his 2FA secret and backup codes, ends his sessions, and writes the audit entry ([P] in [api-specification][api] §3.8 and [security][sec] §4.1).
@@ -698,7 +699,7 @@ Supabase may apply minor updates itself and offer major upgrades **[U]**. The st
 
 ## 10. Pre-launch gate checklist
 
-The website opens to customers only when every row is done ([project-charter][charter] phase 7). Rows 1 to 10 come from the docs named; rows 11 to 17 are **[P] (new in this doc)**.
+The website opens to customers only when every row is done ([project-charter][charter] phase 7). Rows 1 to 10 come from the docs named; rows 11 to 17 are **[P] (new in this doc)**; row 18 is **[C]** ([D-28][dl], [D-30][dl]).
 
 | # | Gate | Who | Evidence | Source |
 |---|---|---|---|---|
@@ -723,6 +724,10 @@ The website opens to customers only when every row is done ([project-charter][ch
 | 15 | Every provider's data retention is at its shortest option | Super Admin | Each provider's settings | [privacy-and-retention][priv] §6.2 |
 | 16 | The first monthly offline copy is made, and the sealed second copy of the `age` key is stored | Super Admin | The files | [NFR-28][nfr]; section 5.2 |
 | 17 | The Admin has the [staff guide][staff] and knows "What the Admin should notice and report" | The Admin | — | This document |
+| **Launch** | | | | |
+| 18 | Production was created fresh just before launch (section 2), so it holds no test records and its acknowledgment counter is unused; `public_booking_open` is false there, and the "Opening soon" pages and `noindex` are checked. Last, at launch: the Super Admin turns `public_booking_open` on | Super Admin | The empty business tables and counters before opening; the settings audit entry of the switch | [D-28][dl], [D-30][dl]; [FR-ADM-34][fr]; [roadmap][roadmap] §5 (G22) |
+
+**The launch step [C]** ([D-30][dl]). When rows 1 to 17 are done, the Super Admin opens **Settings** in production, turns on "Online booking open", and confirms. Then: the calendar shows dates, the form can be sent, and the home page no longer sends `noindex`; run the smoke checks of section 3.4.
 
 ---
 
@@ -744,17 +749,17 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 **Environments and setup**
 
-1. **[P] (new in this doc) Short-lived projects** (section 1): a separate week-1 test project and a restore-test project, both deleted afterwards; production data never leaves production except as the encrypted backup.
-2. **[P] (new in this doc) Previews use Cloudflare's Turnstile test keys** (section 1).
-3. **[P] (new in this doc) One account email for every provider,** read daily by the Super Admin (section 2, step 1).
-4. **[P] (new in this doc) Supabase Auth sign-ups turned off** (section 2, step 3.5).
-5. **[P] (new in this doc) Role passwords set by hand** after the migrations, never in a migration file (section 2, step 3.7). [Data-model][data] §2.2 shows `PASSWORD '…'` in an indicative migration.
-6. **[P] (new in this doc) The first IP-HMAC key** is made by running the rotation function once (section 2, step 3.8).
-7. **[P] (new in this doc) DMARC** starts at `p=none` and moves to `p=quarantine` (section 2, step 4).
-8. **[P] (new in this doc) Sentry settings:** server-side scrubbing, no stored IP addresses, alerts by email and phone push, and an alert on every new issue (section 2, step 6; section 6.4).
-9. **[P] (new in this doc) The backup workflow's manual trigger,** and a first decrypt-and-list check (section 2, step 8).
-10. **[P] (new in this doc) The seed script gets production values in the shell only** (section 2, step 9).
-11. **[P] (new in this doc) The first checks** (section 2, step 10), including "no test booking in production".
+1. **[P] (new in this doc) Short-lived projects** (section 1): a separate week-1 test project and a restore-test project, both deleted afterwards; production data never leaves production except as the encrypted backup. Accepted ([D-38][dl]), as changed by [D-28][dl]: the week-1 project is kept as the test project for the build and UAT, and production is created fresh just before launch; the short-lived restore-test project stays.
+2. **[P] (new in this doc) Previews use Cloudflare's Turnstile test keys** (section 1). Accepted ([D-38][dl]).
+3. **[P] (new in this doc) One account email for every provider,** read daily by the Super Admin (section 2, step 1). Accepted ([D-38][dl]).
+4. **[P] (new in this doc) Supabase Auth sign-ups turned off** (section 2, step 3.5). Accepted ([D-38][dl]).
+5. **[P] (new in this doc) Role passwords set by hand** after the migrations, never in a migration file (section 2, step 3.7). [Data-model][data] §2.2 shows `PASSWORD '…'` in an indicative migration. Accepted ([D-38][dl]).
+6. **[P] (new in this doc) The first IP-HMAC key** is made by running the rotation function once (section 2, step 3.8). Accepted ([D-38][dl]).
+7. **[P] (new in this doc) DMARC** starts at `p=none` and moves to `p=quarantine` (section 2, step 4). Accepted ([D-38][dl]).
+8. **[P] (new in this doc) Sentry settings:** server-side scrubbing, no stored IP addresses, alerts by email and phone push, and an alert on every new issue (section 2, step 6; section 6.4). Accepted ([D-38][dl]).
+9. **[P] (new in this doc) The backup workflow's manual trigger,** and a first decrypt-and-list check (section 2, step 8). Accepted ([D-38][dl]).
+10. **[P] (new in this doc) The seed script gets production values in the shell only** (section 2, step 9). Accepted ([D-38][dl]).
+11. **[P] (new in this doc) The first checks** (section 2, step 10), including "no test booking in production". Accepted ([D-38][dl]).
 
 **Deploy and release**
 
@@ -813,7 +818,7 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 
 44. **Email without a domain.** If Resend's free plan sends only to the account's own address until a domain is verified **[U]**, then customer emails ([FR-NTF-01][fr] to [FR-NTF-12][fr]) need a domain, and O-05 must be decided before launch. Is that accepted? (Pre-launch gate 13.)
 45. **GitHub environments on a private free repository [U].** [Security][sec] §4.12 keeps `BACKUP_DATABASE_URL` in a protected environment. If the free plan does not offer environments for a private repository, is a repository secret acceptable?
-46. **Where acceptance testing runs.** Business records can never be deleted ([NFR-22][nfr]), so a test booking made in production stays forever, with its acknowledgment number ([catalog-and-payments][cat] §5.2). Options: (a) acceptance testing on a separate pre-launch project, with production set up fresh just before launch; (b) acceptance testing in production, then a one-time reset of the business tables and the acknowledgment counters by the Super Admin before the first real customer, recorded as a decision. Which is wanted? ([test plan][test], [roadmap][roadmap])
+46. **Where acceptance testing runs.** Resolved ([D-28][dl]): option (a). Business records can never be deleted ([NFR-22][nfr]), so a test booking made in production would stay forever, with its acknowledgment number ([catalog-and-payments][cat] §5.2). The week-1 test and UAT run on a separate test project, and production is set up fresh just before launch (sections 1 and 2; row 18 of section 10).
 
 **Differences between sibling docs found while writing this one** (to be aligned by the owning docs)
 
@@ -822,7 +827,7 @@ These are not decided here. If the reviewers agree, each **[P] (new in this doc)
 49. **How long `job_runs` rows are kept.** Resolved (reconciled 2026-10-21): 30 days, keeping the latest row per job ([data-model][data] §5.15; [api-specification][api] §5.9).
 50. **Job names in `job_runs`.** Resolved (reconciled 2026-10-21): one list, the `job_name` enum of [data-model][data] §3, which holds the `pg_cron` job names of [api-specification][api] §6 plus `tick` and `daily` for the two job routes. The health panel and `app.check_heartbeat()` use it.
 
-**Already open in other documents, and not repeated here:** migrations from the developer's laptop, the heartbeat design, staging, the edge rate-limit rule, and agreeing the exit option in advance ([architecture][arch] open questions 2, 7, 9, 12, and 13); what admins do with a failed email ([notifications-and-tracking][wf-notify] open question 5); how long outbox rows are kept, erasures after a restore, the monthly copy in a 31-day month, and the GitHub and Cloudflare terms ([privacy-and-retention][priv] §11, questions 3, 7, 13, and 14); how a first password reaches the Admin and who deletes a former admin's credentials ([administration][wf-admin] open questions 8 and 11).
+**Already open in other documents, and not repeated here:** the heartbeat design, the edge rate-limit rule, and agreeing the exit option in advance ([architecture][arch] open questions 7, 12, and 13; migrations from the laptop are accepted in [D-38][dl], and staging is settled by [D-28][dl]); what admins do with a failed email ([notifications-and-tracking][wf-notify] open question 5); how long outbox rows are kept, erasures after a restore, the monthly copy in a 31-day month, and the GitHub and Cloudflare terms ([privacy-and-retention][priv] §11, questions 3, 7, 13, and 14). How a first password reaches the Admin and who deletes a former admin's credentials are now settled ([D-36][dl], [D-37][dl], [D-38][dl]).
 
 [dl]: ../00-project/decision-log.md
 [charter]: ../00-project/project-charter.md

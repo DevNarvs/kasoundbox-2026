@@ -64,7 +64,7 @@ Status key: **Draft** = written, awaiting review · **Planned** = not yet writte
 | [Project Status](00-project/project-status.md) | Done, pending tasks, and all open questions | Draft |
 | [Project Charter](00-project/project-charter.md) | Why we're building this, scope, stakeholders, constraints, phases | Draft |
 | [Glossary](00-project/glossary.md) | Plain meaning of every term | Draft |
-| [Decision Log](00-project/decision-log.md) | Decisions D-01–D-24 and open items O-01–O-11 | Draft |
+| [Decision Log](00-project/decision-log.md) | Decisions D-01–D-38 and open items O-01–O-11 | Draft |
 | **01 — Requirements (batch 1)** | | |
 | [Roles and Permissions](01-requirements/roles-and-permissions.md) | Who can do what | Draft |
 | [Business Rules](01-requirements/business-rules.md) | Capacity, holds, limits, blocks, calendar (BR-01–BR-12) | Draft |
@@ -92,7 +92,7 @@ Status key: **Draft** = written, awaiting review · **Planned** = not yet writte
 | [Security](05-technical/security.md) | Threat model and controls | Draft |
 | **06 — Delivery (batch 4)** | | |
 | [Roadmap](06-delivery/roadmap.md) | Phases, milestones, MVP backlog, gates | Draft |
-| [Test Plan](06-delivery/test-plan.md) | 262 test cases, UAT, traceability | Draft |
+| [Test Plan](06-delivery/test-plan.md) | 270 test cases, UAT, traceability | Draft |
 | **07 — Operations (batch 4)** | | |
 | [Deployment and Operations](07-operations/deployment-and-operations.md) | Setup, deploy, backup/restore, monitoring, incident runbooks | Draft |
 | [Staff Guide](07-operations/staff-guide.md) | 27 step-by-step admin procedures | Draft |

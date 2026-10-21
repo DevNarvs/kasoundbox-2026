@@ -138,7 +138,7 @@
 
 ### NFR-03 · Pages are quick, and always current where it matters
 
-**Label:** — (approved design); speed target **[P] (new)** · **Based on:** [D-20](../00-project/decision-log.md)
+**Label:** — (approved design); how the speed target is set **[C]** (D-31) · **Based on:** [D-20](../00-project/decision-log.md), [D-31](../00-project/decision-log.md)
 
 **Requirement.**
 - **Cached pages.** The catalog pages (packages and add-ons) are cached, so they load quickly. The cache is refreshed whenever an admin edits the catalog.
@@ -148,7 +148,7 @@
 **Details.**
 - These choices also keep usage inside the Vercel Hobby limits (NFR-06).
 - **Success criterion.** A customer on a phone can submit a request in a few minutes and receive a reference code and a QR code ([project-charter](../00-project/project-charter.md), success criteria).
-- **Speed target [P] (new).** The approved design sets no number for page speed. Proposal: the week-1 test records the real delays between the website and the database. The go / no-go decision at the end of the week-1 test then sets a target, and the target is added here.
+- **Speed target [C]** (D-31). The approved design sets no number for page speed. The week-1 test records the real delays between the website and the database. The go / no-go decision at the end of the week-1 test, recorded as a decision in the [decision log](../00-project/decision-log.md), then sets the target: the p95 measured in week 1, plus a safety margin. The target is added here.
 
 **How it is checked.** Week-1 item 1 (latency). End-to-end tests at phone size (NFR-16).
 

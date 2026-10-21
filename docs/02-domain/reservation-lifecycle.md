@@ -185,7 +185,7 @@ Rules:
 
 ### 3.3 Deadlines are checked, not left to the jobs
 
-- A hold whose deadline has passed, and whose expiry is not paused, **counts as expired at once**: on the calendar ([BR-05][br]), on the status page, and in every admin action.
+- A hold whose deadline has passed, and whose expiry is not paused, **counts as expired at once**: on the calendar ([BR-05][br]), on the status page, and in every admin action. A hold whose expiry is paused counts as expired once its service start arrives ([BR-12][br]) **[C]** (D-25).
 - So approving it, or recording its deposit, is refused, unless expiry is paused for proof review ([BR-12][br], [EC-23][ec]). The other admin actions also treat it as Expired, so it cannot be extended, for example ([EC-26][ec]).
 - The every-minute job ([FR-SYS-01][fr]) then records the Expired status and queues the expired email. It only tidies up: no rule waits for it ([EC-22][ec]).
 
@@ -242,10 +242,10 @@ In Rosa's case, an admin could also waive the deposit instead of approving it (6
 - **One database function per action.** Each status change, and each action in section 5, is one database function call. The transaction starts and ends inside the database (spec v0.2 §12).
 - **Status and version check.** Each function checks the reservation's current status and version first. A mismatch returns "already changed, please refresh".
 - **One capacity lock.** Every capacity change (book, reschedule, edit, block, recreate) first takes the single capacity lock row with `FOR UPDATE`. A partial unique index allows one live claim per resource per date, across bookings and blocks ([BR-01][br]; [NFR-20][nfr]).
-- **Overdue check inside every function.** "Deadline passed and `expiry_paused` is false" is treated as expired in every function. The jobs are not trusted for this.
+- **Overdue check inside every function.** "Deadline passed and `expiry_paused` is false", or "`expiry_paused` is true and the service start has arrived", is treated as expired in every function, through one shared helper that takes the time as an argument, `app.hold_is_overdue(status, deadline, expiry_paused, service_start, at)` **[C]** (D-25). The jobs are not trusted for this.
 - **Same transaction.** The audit row and the outbox rows are written in the same transaction as the change ([FR-NTF-16][fr]). The audit row stores the names of changed fields, never their values, and never customer contact data.
 - **State fields on a reservation** (spec v0.2 §11): `status`, `deadline`, `expiry_paused`, the flags (urgent, needs-info, legal hold), `needs_info_message`, the refund decision (none, partial, or full; amount; who decided; when), `recreated_from`, and the closure date ([privacy-and-retention][priv]).
-- **Daily job time.** The daily job runs at 00:15 Manila time (`15 16 * * *` in UTC) and works out "today" with `now() AT TIME ZONE 'Asia/Manila'`.
+- **Daily job time.** The daily job runs at 00:15 Manila time (`15 16 * * *` in UTC) and works out "today" with `app.manila_today()`, the Manila date of `app.now()` **[C]** (D-29).
 
 ---
 

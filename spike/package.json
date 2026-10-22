@@ -9,7 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.2.2",
     "@vercel/functions": "3.10.2",
+    "better-auth": "1.7.12",
+    "drizzle-orm": "0.45.4",
     "next": "16.4.2",
     "pg": "8.23.1",
     "pg-pool": "3.14.0",

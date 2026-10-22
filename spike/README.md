@@ -20,6 +20,7 @@ Every probe prints `PASS <id> <detail>` or `FAIL <id> <detail>` and exits non-ze
 | Pooler, TLS, timeouts, latency | `SPIKE_BASE_URL=… npx tsx scripts/check-db.ts` (after 15+ idle minutes: `COLD=1 … check-db.ts`) | W1-1a…W1-1d |
 | Admin login, cookies, client IP | `SPIKE_BASE_URL=… npx tsx --env-file=.env.local scripts/check-auth.ts` (after the admin login steps below) | W1-3a…W1-3h |
 | Timers, email, keep-alive | `npx tsx --env-file=.env.local scripts/check-jobs.ts` (after the jobs steps below; takes about 70 s) | W1-4a…W1-4h |
+| Signed upload | `npx tsx --env-file=.env.local scripts/check-upload.ts`, then with the Data API off: `SPIKE_DATA_API=off npx tsx --env-file=.env.local scripts/check-upload.ts` | W1-5a…W1-5c |
 | Simultaneous bookings | `SPIKE_BASE_URL=… npx tsx --env-file=.env.local scripts/race.ts` (needs `SPIKE_SESSION_POOLER_URL` and `SUPABASE_DB_CA`; takes about 70 s) | W1-2a, W1-2b |
 
 ## Applying the spike migrations (developer)
@@ -49,3 +50,10 @@ supabase db push --db-url "$SPIKE_SESSION_POOLER_URL"   # as postgres, session p
 5. After 24 hours, run `check-jobs.ts`. Check both inboxes, and the Resend dashboard for how the two-recipient email was counted.
 6. Sentry alert: pause the heartbeat for 15 minutes with `select cron.alter_job((select jobid from cron.job where jobname = 'spike_heartbeat'), active := false);`, confirm the alert, then set `active := true` again.
 7. After 7 days, run `check-jobs.ts` again and note whether Supabase sent a pause warning. Other week-1 traffic also reached the project, so this does not isolate the in-database keep-alive.
+
+## Signed upload (item 5, developer)
+
+1. Create the private bucket `payment-proofs`: file size limit 1 MB, allowed MIME types `image/jpeg, image/png, image/webp`.
+2. On Vercel set `SUPABASE_URL` and `SUPABASE_SECRET_KEY`; in `.env.local` set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `CRON_SECRET`. Deploy.
+3. Run `check-upload.ts` with the Data API on. Then turn the Data API off in the dashboard and run it again with `SPIKE_DATA_API=off`.
+4. W1-5d: write down the exact dashboard names of the API exposure settings (exposed schemas, the Data API switch, "automatically expose new tables").

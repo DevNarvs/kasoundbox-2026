@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",
+    "@sentry/nextjs": "11.8.0",
     "@supabase/supabase-js": "2.118.0",
     "@vercel/functions": "3.10.2",
     "@yudiel/react-qr-scanner": "2.6.0",
@@ -31,6 +32,7 @@
     "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tsx": "4.23.15",

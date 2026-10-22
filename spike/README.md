@@ -21,6 +21,7 @@ Every probe prints `PASS <id> <detail>` or `FAIL <id> <detail>` and exits non-ze
 | Admin login, cookies, client IP | `SPIKE_BASE_URL=… npx tsx --env-file=.env.local scripts/check-auth.ts` (after the admin login steps below) | W1-3a…W1-3h |
 | Timers, email, keep-alive | `npx tsx --env-file=.env.local scripts/check-jobs.ts` (after the jobs steps below; takes about 70 s) | W1-4a…W1-4h |
 | Signed upload | `npx tsx --env-file=.env.local scripts/check-upload.ts`, then with the Data API off: `SPIKE_DATA_API=off npx tsx --env-file=.env.local scripts/check-upload.ts` | W1-5a…W1-5c |
+| Load and pooler clients | `npx tsx --env-file=.env.local scripts/load.ts` (takes about 70 s) | W1-8a |
 | Simultaneous bookings | `SPIKE_BASE_URL=… npx tsx --env-file=.env.local scripts/race.ts` (needs `SPIKE_SESSION_POOLER_URL` and `SUPABASE_DB_CA`; takes about 70 s) | W1-2a, W1-2b |
 
 ## Applying the spike migrations (developer)
@@ -74,3 +75,16 @@ supabase db push --db-url "$SPIKE_SESSION_POOLER_URL"   # as postgres, session p
 3. Apply `0004_backup_grants.sql`. In GitHub, set the secrets `BACKUP_DATABASE_URL` (`app_backup.<project-ref>` on the session pooler, port 5432, no `sslmode`) and `SUPABASE_DB_CA`, and the variable `BACKUP_AGE_RECIPIENT`.
 4. Run the `spike-backup` workflow by hand. Its log shows W1-7a and W1-7b. W1-7c: check GitHub's docs for a `timezone` key on `schedule`; the cron is written in UTC either way.
 5. Download the artifact (it holds `db-YYYYMMDD.dump.age` and `db-YYYYMMDD.meta`), then run `scripts/restore-check.sh db-YYYYMMDD.dump.age kasoundbox-backup.key` (needs Docker and `age`). Don't book anything while the workflow runs: the counts are taken just before the dump.
+
+## Usage, cache refresh, reload prompt, Docker, migrations, Sentry, firewall (items 8 and 9, developer)
+
+The build now reads the database (the catalog page is prerendered with its price), so `DATABASE_URL` and `SUPABASE_DB_CA` must be set for the Vercel build too. Apply `0005_spike_price.sql` first.
+
+- W1-8a: run `load.ts`, then screenshot the Vercel usage page; every Hobby allotment must be far below its limit.
+- W1-8b: backup run time × 30, plus the CI estimate, against the private-repo Actions allowance.
+- W1-9a: signed in, open `/spike/catalog`, change the price, then open the page again in a new tab. The new price must show at once.
+- W1-9b: open `/spike/form`, type a draft, then redeploy **without the build cache** (Vercel: Redeploy, untick "Use existing Build Cache"). Then submit from the old tab: the reload prompt must show, and the draft must still be there after the reload. With the build cache, Next keeps its Server Actions key (`.next/cache/.rscinfo`, 14 days), so unchanged actions keep working across deploys.
+- W1-9c: `docker build --network host --secret id=spike_env,src=.env.local -t kasoundbox-spike .`, then `docker run --rm --network host --env-file <file without the CA> -e SUPABASE_DB_CA="$(cat <ca file>)" kasoundbox-spike` (Docker env files cannot hold the multi-line CA). Check `/` and `/api/health`.
+- W1-9d: `npx drizzle-kit generate --config w1-9d/drizzle.config.ts --name w19d_probe`, copy the file into a scratch project's `supabase/migrations`, and run `supabase migration list` there (on a project or a local database, never production).
+- W1-9e: set `SENTRY_DSN` on Vercel, then open `/spike/sentry?mode=cached&stamp=1` and `/spike/sentry?mode=live&stamp=2`. Both errors must show in Sentry. Note whether the live one arrives twice.
+- W1-9f: in Vercel Firewall, try one rate-limit rule that covers both `/api/spike/book` and `/api/spike/db`; record whether one rule can match both paths.

@@ -1,0 +1,6 @@
+node_modules
+.next
+.env*
+!.env.example
+public/zxing
+npm-debug.log*

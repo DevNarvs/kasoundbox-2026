@@ -1,0 +1,90 @@
+# Week-1 spike, item 7 (TC-W1-07), on the test project only. Deleted with spike/ after the go/no-go (D-32).
+# Dumps the app and admin_auth schemas as app_backup through the session pooler (5432) with verified TLS,
+# encrypts the dump with age, and keeps it as a 14-day artifact. Nothing is committed.
+name: spike-backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 03:00 Manila, written in UTC. Whether `schedule` accepts a time zone is W1-7c (recorded by hand).
+    - cron: '0 19 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spike-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      SUPABASE_DB_CA: ${{ secrets.SUPABASE_DB_CA }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+    steps:
+      - name: Verified TLS to the session pooler
+        run: |
+          [ -n "$BACKUP_DATABASE_URL" ] && [ -n "$SUPABASE_DB_CA" ] && [ -n "$BACKUP_AGE_RECIPIENT" ] \
+            || { echo "Set BACKUP_DATABASE_URL, SUPABASE_DB_CA (secrets) and BACKUP_AGE_RECIPIENT (variable)"; exit 1; }
+          install -d -m 700 "$RUNNER_TEMP/pg"
+          printf '%s\n' "$SUPABASE_DB_CA" > "$RUNNER_TEMP/pg/ca.crt"
+          {
+            echo "PGSSLMODE=verify-full"
+            echo "PGSSLROOTCERT=$RUNNER_TEMP/pg/ca.crt"
+            echo "PGCONNECT_TIMEOUT=10"
+            echo "STAMP=$(date -u +%Y%m%d)"
+          } >> "$GITHUB_ENV"
+
+      - name: Install age and the PGDG client for the server's major version
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSLo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y -q age postgresql-client
+          major=$(( $(psql "$BACKUP_DATABASE_URL" -Atc 'show server_version_num') / 10000 ))
+          sudo apt-get install -y -q "postgresql-client-$major"
+          echo "PG_BIN=/usr/lib/postgresql/$major/bin" >> "$GITHUB_ENV"
+
+      - name: Client matches the server (W1-7a, W1-7b)
+        run: |
+          server_num=$("$PG_BIN/psql" "$BACKUP_DATABASE_URL" -Atc 'show server_version_num')
+          server_version=$("$PG_BIN/psql" "$BACKUP_DATABASE_URL" -Atc 'show server_version')
+          dump_version=$("$PG_BIN/pg_dump" --version)
+          server_major=$(( server_num / 10000 ))
+          dump_major=$(grep -oE '[0-9]+' <<< "$dump_version" | head -1)
+          echo "W1-7b server $server_version; $dump_version"
+          [ "$dump_major" -ge "$server_major" ] || { echo "FAIL W1-7a pg_dump $dump_major is older than server $server_major"; exit 1; }
+          echo "SERVER_MAJOR=$server_major" >> "$GITHUB_ENV"
+
+      - name: Log row counts and checksums
+        run: |
+          mkdir -p out
+          meta="out/db-$STAMP.meta"
+          echo "server_major=$SERVER_MAJOR" > "$meta"
+          # Assigned first: a failing query inside echo "$(…)" would not stop the step.
+          for t in app.resources app.resource_claims; do
+            count=$("$PG_BIN/psql" "$BACKUP_DATABASE_URL" -Atc "select count(*) from $t")
+            sum=$("$PG_BIN/psql" "$BACKUP_DATABASE_URL" -Atc "select coalesce(md5(string_agg(x::text, '|' order by x::text collate \"C\")), '') from $t x")
+            printf 'count.%s=%s\nmd5.%s=%s\n' "$t" "$count" "$t" "$sum" >> "$meta"
+          done
+          cat "$meta"
+
+      - name: Dump and encrypt (the plain dump never touches the disk)
+        run: |
+          "$PG_BIN/pg_dump" -Fc --schema=app --schema=admin_auth -d "$BACKUP_DATABASE_URL" \
+            | age -r "$BACKUP_AGE_RECIPIENT" -o "out/db-$STAMP.dump.age"
+          ls -l out
+          echo "PASS W1-7a dump completed and encrypted"
+
+      - name: Keep the encrypted dump for 14 days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: db-${{ env.STAMP }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: error

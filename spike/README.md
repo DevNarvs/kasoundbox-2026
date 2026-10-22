@@ -66,3 +66,11 @@ supabase db push --db-url "$SPIKE_SESSION_POOLER_URL"   # as postgres, session p
 2. W1-6a: on the Admin's phone and on the laptop, open `/admin/scan` and scan all 5 codes from a screen and from paper. Pass = 5/5 on each device.
 3. W1-6a-shot and W1-6a-denied: refuse the camera permission, reload `/admin/scan`, upload a screenshot of a code, and check the token shows.
 4. W1-6b: sign in on the phone at `/admin/login`, then open a code with the phone's own camera app. Record which message `/r/…` shows.
+
+## Backup and restore (item 7, developer)
+
+1. Confirm the GitHub repository is private (O-06).
+2. Offline, run `age-keygen -o kasoundbox-backup.key`; keep the key file off the laptop's synced folders. Its public line (`age1…`) is the recipient.
+3. Apply `0004_backup_grants.sql`. In GitHub, set the secrets `BACKUP_DATABASE_URL` (`app_backup.<project-ref>` on the session pooler, port 5432, no `sslmode`) and `SUPABASE_DB_CA`, and the variable `BACKUP_AGE_RECIPIENT`.
+4. Run the `spike-backup` workflow by hand. Its log shows W1-7a and W1-7b. W1-7c: check GitHub's docs for a `timezone` key on `schedule`; the cron is written in UTC either way.
+5. Download the artifact (it holds `db-YYYYMMDD.dump.age` and `db-YYYYMMDD.meta`), then run `scripts/restore-check.sh db-YYYYMMDD.dump.age kasoundbox-backup.key` (needs Docker and `age`). Don't book anything while the workflow runs: the counts are taken just before the dump.

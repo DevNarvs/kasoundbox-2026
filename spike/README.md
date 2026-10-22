@@ -17,3 +17,14 @@ Every probe prints `PASS <id> <detail>` or `FAIL <id> <detail>` and exits non-ze
 | Probe | Command | Settles |
 |---|---|---|
 | Health and region | `SPIKE_BASE_URL=https://<test-app> npx tsx scripts/check-health.ts` | W1-1e, W1-1f |
+| Pooler, TLS, timeouts, latency | `SPIKE_BASE_URL=… npx tsx scripts/check-db.ts` (after 15+ idle minutes: `COLD=1 … check-db.ts`) | W1-1a…W1-1d |
+
+## Applying the spike migrations (developer)
+
+```bash
+supabase db push --db-url "$SPIKE_SESSION_POOLER_URL"   # as postgres, session pooler 5432
+# then, once, as postgres (passwords from your password manager; never committed):
+#   alter role app_rw password '…';  alter role app_backup password '…';
+```
+
+`DATABASE_URL` for the app is `app_rw.<project-ref>` on the transaction pooler (6543), with no `sslmode`.

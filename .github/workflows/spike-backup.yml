@@ -16,6 +16,11 @@ concurrency:
   group: spike-backup
   cancel-in-progress: false
 
+# Without this, steps run as `bash -e {0}` (no pipefail), and a failing pg_dump piped into age would still pass.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   backup:
     runs-on: ubuntu-24.04

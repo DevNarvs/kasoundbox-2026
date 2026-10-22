@@ -18,6 +18,7 @@ Every probe prints `PASS <id> <detail>` or `FAIL <id> <detail>` and exits non-ze
 |---|---|---|
 | Health and region | `SPIKE_BASE_URL=https://<test-app> npx tsx scripts/check-health.ts` | W1-1e, W1-1f |
 | Pooler, TLS, timeouts, latency | `SPIKE_BASE_URL=… npx tsx scripts/check-db.ts` (after 15+ idle minutes: `COLD=1 … check-db.ts`) | W1-1a…W1-1d |
+| Simultaneous bookings | `SPIKE_BASE_URL=… npx tsx --env-file=.env.local scripts/race.ts` (needs `SPIKE_SESSION_POOLER_URL` and `SUPABASE_DB_CA`; takes about 70 s) | W1-2a, W1-2b |
 
 ## Applying the spike migrations (developer)
 

@@ -9,9 +9,11 @@ if (!sessionUrl) throw new Error('Set SPIKE_SESSION_POOLER_URL');
 const ROUNDS = 5;
 const CONCURRENCY = 20;
 const SETTLE_MS = 60_000;
+// Each booking holds the capacity lock this long, so calls that arrive together really wait on each other.
+const HOLD_MS = 50;
 const BAD_DETAIL = /prepared statement|55P03|idle/i;
 
-type BookResult = { code?: string; detail?: string };
+type BookResult = { code?: string; detail?: string; instance?: string; started?: string; ended?: string };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,13 +47,28 @@ async function book(date: string): Promise<BookResult> {
     const res = await fetch(`${base}/api/spike/book`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ date }),
+      body: JSON.stringify({ date, holdMs: HOLD_MS }),
     });
     const body = (await res.json().catch(() => ({}))) as BookResult;
     return body.code ? body : { code: 'error', detail: `HTTP ${res.status}` };
   } catch (e) {
     return { code: 'error', detail: (e as Error).message };
   }
+}
+
+// True when at least two bookings ran in the database at the same time (one waited on the capacity lock while
+// another held it). With one instance and a pool of 1 they run one after another, and the round proves nothing.
+function overlapped(results: BookResult[]): boolean {
+  const spans = results
+    .filter((r) => r.started && r.ended)
+    .map((r) => [Number(r.started), Number(r.ended)] as const)
+    .sort((a, b) => a[0] - b[0]);
+  let latestEnd = -Infinity;
+  for (const [start, end] of spans) {
+    if (start < latestEnd) return true;
+    latestEnd = Math.max(latestEnd, end);
+  }
+  return false;
 }
 
 async function round(db: Client, n: number): Promise<Check> {
@@ -62,10 +79,14 @@ async function round(db: Client, n: number): Promise<Check> {
   const errors = results.filter((r) => r.code !== 'ok' && r.code !== 'sold_out');
   const bad = results.filter((r) => r.detail && BAD_DETAIL.test(r.detail));
   const first = errors[0]?.detail ?? bad[0]?.detail;
+  const instances = new Set(results.map((r) => r.instance).filter(Boolean)).size;
+  const concurrent = overlapped(results);
   return {
     id: `W1-2a-round${n}`,
-    pass: ok === 1 && soldOut === CONCURRENCY - 1 && errors.length === 0 && bad.length === 0,
-    detail: `date=${date} ok=${ok} sold_out=${soldOut} error=${errors.length}${first ? ` first=${first}` : ''}`,
+    pass: ok === 1 && soldOut === CONCURRENCY - 1 && errors.length === 0 && bad.length === 0 && concurrent,
+    detail:
+      `date=${date} ok=${ok} sold_out=${soldOut} error=${errors.length} instances=${instances} ` +
+      `concurrent=${concurrent ? 'yes' : 'no (the bookings ran one after another)'}${first ? ` first=${first}` : ''}`,
   };
 }
 
@@ -94,9 +115,15 @@ async function main() {
       detail: rows[0].ok ? `idle in transaction=${idle}` : 'setup role cannot read other sessions (needs pg_read_all_stats)',
     });
 
+    // pg_stat_activity shows Supavisor's server connections, not the clients Vercel holds to it, so this is a
+    // record only; the verdict on client leaks is the dashboard's pooler client chart (screenshot).
     await sleep(SETTLE_MS);
     const after = await count(db, clientsSql);
-    checks.push({ id: 'W1-2b', pass: after <= before, detail: `app_rw clients before=${before} after=${after}` });
+    checks.push({
+      id: 'W1-2b',
+      pass: true,
+      detail: `recorded: app_rw server connections before=${before} after=${after}; verdict from the dashboard's pooler client chart`,
+    });
   } catch (e) {
     checks.push({ id: 'race-setup', pass: false, detail: (e as Error).message });
   } finally {

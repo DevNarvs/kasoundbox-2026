@@ -49,6 +49,7 @@ async function attempt(id: string, fn: () => Promise<Check>): Promise<Check> {
 async function main() {
   const checks: Check[] = [];
   let okSlot: Slot | null = null;
+  let bigSlot: Slot | null = null;
 
   checks.push(
     await attempt('W1-5a-ok', async () => {
@@ -57,7 +58,8 @@ async function main() {
       return { id: 'W1-5a-ok', pass: r.ok, detail: r.message };
     }),
     await attempt('W1-5a-big', async () => {
-      const r = await upload(await newSlot(), 'big.jpg', 'image/jpeg');
+      bigSlot = await newSlot();
+      const r = await upload(bigSlot, 'big.jpg', 'image/jpeg');
       return { id: 'W1-5a-big', pass: !r.ok, detail: r.ok ? `accepted (${r.message})` : `refused: ${r.message}` };
     }),
     await attempt('W1-5a-svg', async () => {
@@ -70,10 +72,19 @@ async function main() {
         detail: `${r.ok ? `accepted (${r.message})` : `refused: ${r.message}`}; declared as image/webp: ${spoofed.ok ? 'accepted' : `refused: ${spoofed.message}`}`,
       };
     }),
+    // Reuse is tested on the slot whose first upload was refused (nothing stored yet), so a refusal can only mean
+    // the token is single-use. The stored slot's second upload shows "no overwrite" (upsert: false), not reuse.
     await attempt('W1-5b', async () => {
-      if (!okSlot) return { id: 'W1-5b', pass: false, detail: 'no slot from W1-5a-ok' };
-      const r = await upload(okSlot, 'ok.webp', 'image/webp');
-      return { id: 'W1-5b', pass: true, detail: `second upload with the same token: ${r.ok ? 'accepted' : `refused: ${r.message}`}` };
+      if (!okSlot || !bigSlot) return { id: 'W1-5b', pass: false, detail: 'no slots from W1-5a-ok and W1-5a-big' };
+      const reuse = await upload(bigSlot, 'ok.webp', 'image/webp');
+      const overwrite = await upload(okSlot, 'ok.webp', 'image/webp');
+      return {
+        id: 'W1-5b',
+        pass: true,
+        detail:
+          `token reused after a refused upload: ${reuse.ok ? 'accepted (the link is reusable)' : `refused: ${reuse.message}`}; ` +
+          `same token on a stored file: ${overwrite.ok ? 'accepted (overwrote!)' : `refused: ${overwrite.message}`}`,
+      };
     }),
   );
 

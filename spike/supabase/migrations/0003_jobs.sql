@@ -25,6 +25,9 @@ select cron.schedule('spike_every_minute', '* * * * *',
   $$insert into app.job_runs (job, source) values ('every_minute', 'pg_cron')$$);
 
 -- The tick through pg_net, with the bearer from Vault; the request id is kept for the response log.
+-- Created inactive: running every minute would keep the function and the pooler warm (no cold sample) and give
+-- the project outside traffic every minute (the 7-day pause watch could not fail). The real app calls the tick
+-- only when emails are due. Turn it on for a short window only (README).
 select cron.schedule('spike_tick', '* * * * *', $$
   insert into app.job_runs (job, source, note)
   select 'tick_request', 'pg_cron', net.http_post(
@@ -33,6 +36,7 @@ select cron.schedule('spike_tick', '* * * * *', $$
                (select decrypted_secret from vault.decrypted_secrets where name = 'job_route_secret')),
     timeout_milliseconds := 30000)::text
 $$);
+select cron.alter_job((select jobid from cron.job where jobname = 'spike_tick'), active := false);
 
 -- Heartbeat: a Sentry check-in only while the every-minute job is fresh (architecture §7.4).
 select cron.schedule('spike_heartbeat', '*/5 * * * *', $$

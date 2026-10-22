@@ -50,9 +50,10 @@ async function checkExtensions(db: Client): Promise<Check> {
 }
 
 async function checkOnTime(db: Client): Promise<Check> {
+  // The time since the last row counts as a gap too, so a job that stopped before the run is caught.
   const { rows } = await db.query<{ n: string; first: Date | null; max_gap: number | null }>(
     `select count(*) as n, min(started_at) as first,
-            extract(epoch from max(gap))::float8 as max_gap
+            extract(epoch from greatest(max(gap), now() - max(started_at)))::float8 as max_gap
        from (select started_at, started_at - lag(started_at) over (order by started_at) as gap
                from app.job_runs
               where job = 'every_minute' and started_at > now() - $1::float8 * interval '1 hour') t`,

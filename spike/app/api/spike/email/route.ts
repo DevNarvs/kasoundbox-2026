@@ -13,15 +13,22 @@ export async function POST(request: NextRequest) {
   const { key, to } = (await request.json().catch(() => ({}))) as EmailBody;
   if (!key || !to) return Response.json({ error: 'key and to are required' }, { status: 400 });
 
-  const res = await fetch(`${process.env.SPIKE_RESEND_URL ?? 'https://api.resend.com'}/emails`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'content-type': 'application/json',
-      'idempotency-key': key,
-    },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, to, subject: 'Kasoundbox spike email', text: `Probe key ${key}` }),
-  });
+  // `||`, not `??`: an empty SPIKE_RESEND_URL (set but blank on Vercel) must still mean the real Resend API.
+  const url = `${process.env.SPIKE_RESEND_URL || 'https://api.resend.com'}/emails`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM, to, subject: 'Kasoundbox spike email', text: `Probe key ${key}` }),
+    });
+  } catch (e) {
+    return Response.json({ error: `${(e as Error).message} (${url})` }, { status: 502 });
+  }
   const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
   const usage = Object.fromEntries([...res.headers].filter(([name]) => /quota|ratelimit/i.test(name)));
 

@@ -17,7 +17,8 @@ if (!base || !sessionUrl || !email || !password || !totpSecret) {
 
 const ARGON2ID_PREFIX = '$argon2id$v=19$m=19456,t=2,p=1$';
 const IP_HEADERS = ['x-vercel-forwarded-for', 'x-real-ip', 'x-forwarded-for'] as const;
-const SPOOF = { 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '5.6.7.8' };
+const SPOOF = { 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '5.6.7.8', 'x-vercel-forwarded-for': '9.9.9.9' };
+const SPOOFED_VALUE = /1\.2\.3\.4|5\.6\.7\.8|9\.9\.9\.9/;
 const BETTER_AUTH_TABLES = ['account', 'session', 'two_factor', 'user', 'verification'];
 // From better-auth/dist/plugins/two-factor/backup-codes/index.d.mts (1.7.12): no one-way hash option.
 const BACKUP_CODE_OPTIONS = "library options: 'plain' | 'encrypted' (default) | custom { encrypt, decrypt }";
@@ -73,15 +74,16 @@ async function ipEcho(headers: Record<string, string> = {}): Promise<IpEcho> {
   return res.json();
 }
 
-async function checkHash(db: Client): Promise<Check> {
+// The hash is made on the laptop by seed-admin.ts; the sign-in is what proves argon2 verify runs on the deployment.
+async function checkHash(db: Client, signedIn: boolean): Promise<Check> {
   const { rows } = await db.query<{ password: string }>(
     'select password from admin_auth.account where password is not null',
   );
   const good = rows.filter((r) => r.password.startsWith(ARGON2ID_PREFIX)).length;
   return {
     id: 'W1-3a',
-    pass: rows.length > 0 && good === rows.length,
-    detail: `${good}/${rows.length} credential hashes start with ${ARGON2ID_PREFIX}`,
+    pass: rows.length > 0 && good === rows.length && signedIn,
+    detail: `${good}/${rows.length} credential hashes start with ${ARGON2ID_PREFIX}; sign-in on the deployment ${signedIn ? 'worked' : 'FAILED (see W1-3c)'}`,
   };
 }
 
@@ -91,7 +93,7 @@ async function checkIpHeaders(): Promise<{ check: Check; clientIp: string | null
     const plain = await ipEcho();
     const spoofed = await ipEcho(SPOOF);
     const unaffected = IP_HEADERS.filter(
-      (h) => spoofed[h] !== null && spoofed[h] === plain[h] && !/1\.2\.3\.4|5\.6\.7\.8/.test(spoofed[h] ?? ''),
+      (h) => spoofed[h] !== null && spoofed[h] === plain[h] && !SPOOFED_VALUE.test(spoofed[h] ?? ''),
     );
     const clientIp = unaffected.length ? plain[unaffected[0]]!.split(',')[0].trim() : null;
     const state = IP_HEADERS.map((h) => `${h}=${unaffected.includes(h) ? 'unaffected' : spoofed[h] === null ? 'absent' : 'spoofable'}`);
@@ -174,8 +176,10 @@ async function checkProtectedAction(cookie: string | null): Promise<Check> {
   }
 }
 
-async function checkNoRawIp(db: Client, clientIp: string | null): Promise<Check> {
+// Only meaningful after a sign-in has written a session row.
+async function checkNoRawIp(db: Client, clientIp: string | null, signedIn: boolean): Promise<Check> {
   const id = 'W1-3e';
+  if (!signedIn) return { id, pass: false, detail: 'no sign-in, so no session row to check (see W1-3c)' };
   if (!clientIp) return { id, pass: false, detail: 'client IP unknown (W1-3b found no trusted header)' };
   const needles = [...new Set([clientIp, clientIp.replace(/^::ffff:/i, '')])];
   const { rows: cols } = await db.query<{ table_name: string; column_name: string }>(
@@ -275,11 +279,11 @@ async function main() {
     const ip = await checkIpHeaders();
     const login = await checkCookie();
     checks.push(
-      await guard('W1-3a', () => checkHash(db)),
+      await guard('W1-3a', () => checkHash(db, login.cookie !== null)),
       ip.check,
       login.check,
       await checkProtectedAction(login.cookie),
-      await guard('W1-3e', () => checkNoRawIp(db, ip.clientIp)),
+      await guard('W1-3e', () => checkNoRawIp(db, ip.clientIp, login.cookie !== null)),
       await guard('W1-3f', () => checkTotpStorage(db)),
       await guard('W1-3g', () => checkTables(db, login.cookie !== null)),
     );

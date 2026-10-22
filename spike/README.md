@@ -57,3 +57,12 @@ supabase db push --db-url "$SPIKE_SESSION_POOLER_URL"   # as postgres, session p
 2. On Vercel set `SUPABASE_URL` and `SUPABASE_SECRET_KEY`; in `.env.local` set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `CRON_SECRET`. Deploy.
 3. Run `check-upload.ts` with the Data API on. Then turn the Data API off in the dashboard and run it again with `SPIKE_DATA_API=off`.
 4. W1-5d: write down the exact dashboard names of the API exposure settings (exposed schemas, the Data API switch, "automatically expose new tables").
+
+## QR scanning (item 6, developer + Admin)
+
+`npm run build` copies the scanner's WASM into `public/zxing/` and checks its checksum. Then, on the deployed test site:
+
+1. Open `/spike/qr-sheet` on the laptop; print it too.
+2. W1-6a: on the Admin's phone and on the laptop, open `/admin/scan` and scan all 5 codes from a screen and from paper. Pass = 5/5 on each device.
+3. W1-6a-shot and W1-6a-denied: refuse the camera permission, reload `/admin/scan`, upload a screenshot of a code, and check the token shows.
+4. W1-6b: sign in on the phone at `/admin/login`, then open a code with the phone's own camera app. Record which message `/r/…` shows.
